@@ -1,0 +1,9 @@
+{
+  "meta": {
+    "name": "Painboy Bot Ascension Healing Intel API Seed",
+    "version": "0.1.0"
+  },
+  "notes": [
+    "Embedded advisory data package for future healer detection."
+  ]
+}
