@@ -1,0 +1,115 @@
+local _, ns = ...
+local Auras = ns:RegisterModule("Auras", {})
+ns.Auras = Auras
+
+local positionMap = {}
+
+local function collectActiveAuras(unit)
+    local active = {}
+    if not unit then return active end
+    for i = 1, 40 do
+        local name, _, icon, count, _, duration, expirationTime, caster = UnitAura(unit, i, "HELPFUL")
+        if not name then break end
+        if caster == "player" then
+            local pos = positionMap[string.lower(name)]
+            if pos and not active[pos] then
+                active[pos] = { icon = icon, count = count, duration = duration, expires = expirationTime }
+            end
+        end
+    end
+    return active
+end
+
+function Auras:OnInitialize()
+    local intel = ns.HealingIntel or {}
+    for pos, list in pairs(intel.trackedAuras or {}) do
+        for _, name in ipairs(list) do positionMap[string.lower(name)] = pos end
+    end
+end
+
+function Auras:UpdateButtonAuras(btn, cached)
+    if not btn or not btn.auraIndicators then return end
+    
+    local active = cached
+    if btn.fakeData then
+        active = {}
+        local t = GetTime()
+        local offset = (btn.index or 0) * 1.5
+        local group = btn.fakeData.group or 1
+        local pos = (group - 1) % 4 + 1
+        if pos == 1 then
+            local dur = 15
+            local expires = t + (dur - ((t + offset) % dur))
+            active.topleft = { icon = "Interface\\Icons\\Spell_Nature_Rejuvenation", count = 0, duration = dur, expires = expires }
+        elseif pos == 2 then
+            local dur = 12
+            local expires = t + (dur - ((t + offset) % dur))
+            active.topright = { icon = "Interface\\Icons\\Spell_Nature_Riptide", count = 0, duration = dur, expires = expires }
+        elseif pos == 3 then
+            local dur = 10
+            local expires = t + (dur - ((t + offset) % dur))
+            active.bottomleft = { icon = "Interface\\Icons\\Spell_Holy_FlashHeal", count = 0, duration = dur, expires = expires }
+        elseif pos == 4 then
+            local dur = 8
+            local expires = t + (dur - ((t + offset) % dur))
+            active.bottomright = { icon = "Interface\\Icons\\Spell_Nature_HealingWave", count = 0, duration = dur, expires = expires }
+        end
+    elseif btn.unit then
+        active = active or collectActiveAuras(btn.unit)
+    end
+
+    for pos, ind in pairs(btn.auraIndicators) do
+        local data = active and active[pos]
+        if data then
+            ind.icon:SetTexture(data.icon)
+            ind.countText:SetText(data.count > 1 and data.count or "")
+            
+            if data.duration and data.duration > 0 then
+                ind.cd:SetCooldown(data.expires - data.duration, data.duration)
+                ind.cd:Show()
+                
+                ind:SetScript("OnUpdate", function(selfIndicator, _)
+                    if not ns.DB.frame.showAuraTimers then
+                        selfIndicator.timerText:SetText("")
+                        return
+                    end
+                    local remain = data.expires - GetTime()
+                    if remain <= 0 then
+                        selfIndicator.timerText:SetText("")
+                        selfIndicator:SetScript("OnUpdate", nil)
+                    else
+                        if remain < 2.5 then
+                            selfIndicator.timerText:SetTextColor(1, 0.1, 0.1)
+                        elseif remain < 5 then
+                            selfIndicator.timerText:SetTextColor(1, 0.8, 0)
+                        else
+                            selfIndicator.timerText:SetTextColor(1, 1, 1)
+                        end
+                        
+                        if remain > 10 then
+                            selfIndicator.timerText:SetText(math.floor(remain))
+                        else
+                            selfIndicator.timerText:SetText(string.format("%.1f", remain))
+                        end
+                    end
+                end)
+            else
+                ind.cd:Hide()
+                ind.timerText:SetText("")
+                ind:SetScript("OnUpdate", nil)
+            end
+            ind:Show()
+        else
+            ind:Hide()
+            ind:SetScript("OnUpdate", nil)
+        end
+    end
+end
+
+function Auras:OnEvent(event, unit)
+    if event == "UNIT_AURA" then
+        for _, b in ipairs(ns.Frames.buttons) do
+            if b.unit == unit then self:UpdateButtonAuras(b) end
+        end
+    end
+end

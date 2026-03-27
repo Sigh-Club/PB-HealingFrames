@@ -59,19 +59,24 @@ local function applyBinding(btn, slot, data)
 end
 
 function ClickCast:RefreshAll()
-    if ns:InCombatLockdown() then
+    if InCombatLockdown() then
         ns:Debug("Skipped binding refresh in combat")
         return
     end
     if not ns.Frames or not ns.Frames.buttons then return end
     for _, btn in ipairs(ns.Frames.buttons) do
         if btn then
-            for _, slot in ipairs(ns.Bindings:GetOrderedSlots()) do
-                applyBinding(btn, slot, ns.Bindings:Get(slot))
-            end
+            self:ApplyBindings(btn)
         end
     end
     ns:Debug((ns.L and ns.L.STATUS_REFRESH) or "Click-cast bindings refreshed")
+end
+
+function ClickCast:ApplyBindings(btn)
+    if not btn then return end
+    for _, slot in ipairs(ns.Bindings:GetOrderedSlots()) do
+        applyBinding(btn, slot, ns.Bindings:Get(slot))
+    end
 end
 
 function ClickCast:OnLeaveCombat()

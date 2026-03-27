@@ -1,8 +1,11 @@
 
 local _, ns = ...
+ns = ns or _G.MTCHealingFrames or {}
+_G.MTCHealingFrames = ns
+
 ns.L = ns.L or {}
 
-ns.L.TITLE = "Painboy"
+ns.L.TITLE = "MTC: Healing Frames"
 ns.L.STATUS_SCAN = "Scan complete"
 ns.L.STATUS_BINDING_SET = "Binding updated"
 ns.L.STATUS_BINDING_CLEARED = "Binding cleared"
@@ -20,6 +23,7 @@ ns.L.ACTION = "Action"
 ns.L.ALL = "All"
 ns.L.HEALING = "Healing"
 ns.L.SUPPORT = "Support"
+ns.L.BUFFS = "Buffs"
 ns.L.CLEANSE = "Cleanse"
 ns.L.RES = "Res"
 ns.L.RECOMMENDED = "Recommended"

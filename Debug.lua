@@ -6,9 +6,29 @@ local function isEnabled()
     return ns.DB and ns.DB.debug and true or false
 end
 
-function ns:Debug(msg)
+local function LogToFile(msg)
+    if not PainboyGlobal then return end
+    PainboyGlobal.debugLog = PainboyGlobal.debugLog or {}
+    
+    local timestamp = date("%Y-%m-%d %H:%M:%S")
+    table.insert(PainboyGlobal.debugLog, "[" .. timestamp .. "] " .. tostring(msg))
+    
+    -- Keep log size manageable (max 1000 entries)
+    if #PainboyGlobal.debugLog > 1000 then
+        table.remove(PainboyGlobal.debugLog, 1)
+    end
+end
+
+function ns:Log(msg)
+    LogToFile(msg)
+end
+
+function ns:Debug(msg, forceLog)
     if isEnabled() then
         self:Print("|cffaaaaaaDEBUG|r " .. tostring(msg))
+    end
+    if isEnabled() or forceLog then
+        LogToFile(msg)
     end
 end
 
@@ -19,4 +39,5 @@ end
 function Debug:SetEnabled(flag)
     ns.DB.debug = flag and true or false
     ns:Print("Debug " .. (ns.DB.debug and "enabled" or "disabled"))
+    LogToFile("Debug mode set to: " .. tostring(ns.DB.debug))
 end

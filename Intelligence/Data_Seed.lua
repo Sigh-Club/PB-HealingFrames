@@ -1,5 +1,8 @@
 
 local _, ns = ...
+ns = ns or _G.MTCHealingFrames or {}
+_G.MTCHealingFrames = ns
+
 local HI = ns.HealingIntel or {}
 ns.HealingIntel = HI
 
@@ -20,11 +23,43 @@ HI.roleSpellIds = {
     damage_to_heal = { 20473, 635, 585, 20271 },
 }
 
+HI.healingRoles = {
+    heal = true,
+    direct_heal = true,
+    hot = true,
+    shield_absorb = true,
+    damage_to_heal = true,
+}
+
+HI.supportRoles = {
+    support = true,
+    cleanse = true,
+    resurrection = true,
+    buff = true,
+    form = true,
+}
+
+HI.racialSpellNames = {
+    "Shadowmeld", "Blood Fury", "Will of the Forsaken", "Cannibalize", "Hardiness", "Berserking",
+    "Stoneform", "Escape Artist", "Perception", "The Human Spirit", "Diplomacy", "Mace Specialization",
+    "Sword Specialization", "Find Treasure", "Gun Specialization", "Frost Resistance", "Nature Resistance",
+    "Shadow Resistance", "Arcane Resistance", "Fire Resistance", "Expansive Mind", "Engineering Specialization",
+    "Every Man for Himself", "Gift of the Naaru", "Heroic Presence", "Shadow Resistance", "Gemcutting",
+    "War Stomp", "Cultivation", "Endurance", "Nature Resistance", "Axe Specialization", "Command",
+    "Blood Frost", "Blood Scent", "Arcane Torrent", "Mana Tap", "Magic Resistance", "Arcane Affinity"
+}
+
+HI.racialSpellIds = {
+    20594, 20572, 7744, 20577, 20573, 26297, 20594, 20589, 20600, 20598, 20599, 20864, 20865, 
+    2481, 20595, 20583, 20582, 20585, 20584, 20581, 20591, 20592, 59752, 28880, 28877, 59544, 28875,
+    20549, 20552, 20550, 20551, 20574, 20575, 28730, 25046, 20271
+}
+
 HI.roleSpellNames = {
     direct_heal = {
         "Heal", "Lesser Heal", "Greater Heal", "Flash Heal", "Binding Heal", "Penance",
         "Holy Light", "Flash of Light", "Holy Shock", "Healing Wave", "Lesser Healing Wave",
-        "Healing Touch", "Regrowth", "Nourish", "Chain Heal", "Prayer of Healing", "Circle of Life"
+        "Healing Touch", "Regrowth", "Nourish", "Chain Heal", "Prayer of Healing", "Circle of Life", "Swiftmend"
     },
     hot = {
         "Renew", "Rejuvenation", "Lifebloom", "Wild Growth", "Riptide", "Prayer of Mending"
@@ -43,6 +78,16 @@ HI.roleSpellNames = {
         "Pain Suppression", "Guardian Spirit", "Innervate", "Power Infusion", "Mana Tide Totem",
         "Hand of Sacrifice", "Hand of Protection", "Hand of Freedom", "Beacon of Light"
     },
+    buff = {
+        "Mark of the Wild", "Gift of the Wild", "Thorns", "Power Word: Fortitude", "Prayer of Fortitude",
+        "Divine Spirit", "Prayer of Spirit", "Shadow Protection", "Prayer of Shadow Protection",
+        "Arcane Intellect", "Arcane Brilliance", "Blessing of Kings", "Greater Blessing of Kings",
+        "Blessing of Might", "Greater Blessing of Might", "Blessing of Wisdom", "Greater Blessing of Wisdom",
+        "Blessing of Sanctuary", "Greater Blessing of Sanctuary"
+    },
+    form = {
+        "Tree of Life"
+    },
     damage_to_heal = {
         "Holy Shock", "Judgement", "Smite", "Atonement"
     },
@@ -55,6 +100,8 @@ HI.keywordRoles = {
     cleanse = { "cleanse", "purify", "abolish", "remove curse", "cure", "dispel", "cleanse spirit" },
     resurrection = { "resurrection", "redemption", "rebirth", "ancestral spirit", "revive" },
     support = { "beacon", "sacred", "pain suppression", "guardian spirit", "innervate", "divine hymn", "mana tide", "power infusion" },
+    buff = { "blessing of", "greater blessing", "mark of the wild", "gift of the wild", "fortitude", "divine spirit", "shadow protection", "arcane intellect", "arcane brilliance", "thorns" },
+    form = { "tree of life", "form" },
     damage_to_heal = { "judgement", "smite", "holy shock", "atonement" },
 }
 
@@ -107,12 +154,63 @@ end
 
 HI.defaultRangeSpells = { "Flash of Light", "Flash Heal", "Heal", "Holy Light", "Healing Wave", "Lesser Healing Wave", "Riptide", "Rejuvenation", "Renew", "Nourish", "Chain Heal", "Cleanse", "Purify", "Dispel Magic" }
 
-HI.healingRoles = {
-    direct_heal = true,
-    hot = true,
-    shield_absorb = true,
-    damage_to_heal = true,
-    cleanse = true,
-    resurrection = true,
-    support = true,
+HI.smartBindPriorities = {
+    -- When hitting "Smart Bind", we want to assign the most logical spell to specific buttons based on what the player currently knows.
+    -- Lower number means higher priority.
+    LeftButton = {
+        -- Primary quick/efficient heal
+        { name = "Flash of Light", priority = 1 },
+        { name = "Flash Heal", priority = 2 },
+        { name = "Lesser Healing Wave", priority = 3 },
+        { name = "Nourish", priority = 4 },
+        { name = "Healing Touch", priority = 5 },
+        { name = "Heal", priority = 6 },
+    },
+    RightButton = {
+        -- Primary HoT or secondary heal
+        { name = "Rejuvenation", priority = 1 },
+        { name = "Renew", priority = 2 },
+        { name = "Riptide", priority = 3 },
+        { name = "Lifebloom", priority = 4 },
+        { name = "Holy Light", priority = 5 },
+        { name = "Greater Heal", priority = 6 },
+        { name = "Healing Wave", priority = 7 },
+    },
+    MiddleButton = {
+        -- Group heal / Special
+        { name = "Chain Heal", priority = 1 },
+        { name = "Wild Growth", priority = 2 },
+        { name = "Circle of Life", priority = 3 },
+        { name = "Prayer of Mending", priority = 4 },
+        { name = "Prayer of Healing", priority = 5 },
+    },
+    Button4 = {
+        -- Shield / Mitigation
+        { name = "Power Word: Shield", priority = 1 },
+        { name = "Earth Shield", priority = 2 },
+        { name = "Sacred Shield", priority = 3 },
+        { name = "Divine Aegis", priority = 4 },
+    },
+    Button5 = {
+        -- "Oh shit" / Fast HoT
+        { name = "Swiftmend", priority = 1 },
+        { name = "Penance", priority = 2 },
+        { name = "Holy Shock", priority = 3 },
+        { name = "Regrowth", priority = 4 },
+    }
+}
+
+HI.trackedAuras = {
+    topleft = {
+        "Rejuvenation", "Renew", "Riptide", "Sacred Shield"
+    },
+    topright = {
+        "Lifebloom", "Prayer of Mending", "Earth Shield", "Beacon of Light"
+    },
+    bottomleft = {
+        "Wild Growth", "Power Word: Shield", "Regrowth", "Divine Aegis"
+    },
+    bottomright = {
+        "Abolish Disease", "Abolish Poison", "Fear Ward", "Pain Suppression"
+    }
 }

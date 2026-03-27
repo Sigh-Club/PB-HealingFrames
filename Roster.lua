@@ -2,7 +2,6 @@ local _, ns = ...
 local Roster = ns:RegisterModule("Roster", {})
 ns.Roster = Roster
 
-Roster.units = {}
 Roster.entries = {}
 
 local testNames = {
@@ -13,79 +12,51 @@ local testNames = {
     "Moonquartz", "Gravewillow", "Skydrift", "Thornwatch", "Silverreed", "Auricvale", "Dreamfen", "Brassroot"
 }
 
-local function buildFakeList(size)
-    wipe(Roster.units)
+local function buildLiveList()
     wipe(Roster.entries)
-    for i = 1, size do
-        local subgroup = math.floor((i - 1) / 5) + 1
-        local role = ({"direct_heal", "hot", "shield_absorb", "support", "cleanse"})[((i - 1) % 5) + 1]
-        local entry = {
-            unit = nil,
-            name = testNames[i] or ("Player" .. i),
-            group = subgroup,
-            fake = true,
-            classToken = ({"PRIEST", "PALADIN", "SHAMAN", "DRUID", "MAGE", "WARLOCK", "ROGUE", "WARRIOR"})[((i - 1) % 8) + 1],
-            role = role,
-        }
-        Roster.entries[#Roster.entries + 1] = entry
-        Roster.units[#Roster.units + 1] = entry
+    if UnitInRaid("player") then
+        for i = 1, GetNumRaidMembers() do
+            local _, _, subgroup = GetRaidRosterInfo(i)
+            table.insert(Roster.entries, { unit = "raid"..i, group = subgroup, fake = false })
+        end
+    elseif GetNumPartyMembers() > 0 then
+        table.insert(Roster.entries, { unit = "player", group = 1, fake = false })
+        for i = 1, GetNumPartyMembers() do
+            table.insert(Roster.entries, { unit = "party"..i, group = 1, fake = false })
+        end
+    else
+        table.insert(Roster.entries, { unit = "player", group = 1, fake = false })
     end
 end
 
-local function buildLiveList()
-    wipe(Roster.units)
+local function buildFakeList(size)
     wipe(Roster.entries)
-    if UnitInRaid("player") then
-        local count = GetNumRaidMembers() or 0
-        for i = 1, count do
-            local unit = "raid" .. i
-            local _, _, subgroup = GetRaidRosterInfo(i)
-            local entry = { unit = unit, group = subgroup or (math.floor((i - 1) / 5) + 1), fake = false }
-            Roster.entries[#Roster.entries + 1] = entry
-            Roster.units[#Roster.units + 1] = unit
-        end
-    elseif GetNumPartyMembers and GetNumPartyMembers() > 0 then
-        local entry = { unit = "player", group = 1, fake = false }
-        Roster.entries[#Roster.entries + 1] = entry
-        Roster.units[#Roster.units + 1] = "player"
-        local count = GetNumPartyMembers()
-        for i = 1, count do
-            local unit = "party" .. i
-            entry = { unit = unit, group = 1, fake = false }
-            Roster.entries[#Roster.entries + 1] = entry
-            Roster.units[#Roster.units + 1] = unit
-        end
-    else
-        local entry = { unit = "player", group = 1, fake = false }
-        Roster.entries[#Roster.entries + 1] = entry
-        Roster.units[#Roster.units + 1] = "player"
+    local debuffTypes = { "Magic", "Curse", "Poison", "Disease" }
+    for i = 1, size do
+        table.insert(Roster.entries, {
+            unit = nil,
+            name = testNames[i] or ("Player"..i),
+            group = math.floor((i-1)/5) + 1,
+            fake = true,
+            classToken = ({"PRIEST", "PALADIN", "SHAMAN", "DRUID", "MAGE", "WARLOCK", "ROGUE", "WARRIOR"})[(i-1)%8 + 1],
+            fakeDebuff = (i % 4 == 0) and debuffTypes[(i/4)%4 + 1] or nil
+        })
     end
 end
 
 function Roster:Refresh()
-    if ns.DB and ns.DB.frame and ns.DB.frame.fakeMode then
-        buildFakeList(ns.DB.frame.fakeSize or 10)
-    else
-        buildLiveList()
-    end
-    if ns.Frames then ns.Frames:ApplyRoster() end
+    if ns.DB.frame.fakeMode then buildFakeList(ns.DB.frame.fakeSize or 10) else buildLiveList() end
+    if ns.Frames then ns.Frames:ApplyLayout() end
 end
 
 function Roster:SetFakeMode(enabled, size)
-    ns.DB.frame.fakeMode = enabled and true or false
-    if size then ns.DB.frame.fakeSize = size end
-    self:Refresh()
-    if ns.UI_Bars and ns.UI_Bars.Refresh then ns.UI_Bars:Refresh() end
-end
-
-function Roster:OnEnable()
+    ns.DB.frame.fakeMode = enabled
+    ns.DB.frame.fakeSize = size or 10
     self:Refresh()
 end
 
 function Roster:OnEvent(event)
-    if event == "PARTY_MEMBERS_CHANGED" or event == "RAID_ROSTER_UPDATE" or event == "PLAYER_ENTERING_WORLD" then
-        if not (ns.DB and ns.DB.frame and ns.DB.frame.fakeMode) then
-            self:Refresh()
-        end
+    if event == "PLAYER_ENTERING_WORLD" or event == "PARTY_MEMBERS_CHANGED" or event == "RAID_ROSTER_UPDATE" then
+        if not ns.DB.frame.fakeMode then self:Refresh() end
     end
 end

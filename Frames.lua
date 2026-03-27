@@ -3,12 +3,12 @@ local Frames = ns:RegisterModule("Frames", {})
 ns.Frames = Frames
 
 Frames.container = nil
-Frames.groupAnchors = {}
 Frames.buttons = {}
 Frames.MAX = 40
-Frames.testTicker = 0
 
 local classColors = RAID_CLASS_COLORS or {}
+local STATUS_BAR_TEX = "Interface\\TargetingFrame\\UI-StatusBar"
+local SOLID_TEX = "Interface\\Buttons\\WHITE8X8"
 
 local function unpackColor(t, default)
     if type(t) == "table" then return t[1] or 1, t[2] or 1, t[3] or 1 end
@@ -17,27 +17,36 @@ end
 
 local function healthColor(pct)
     local f = ns.DB.frame
-    if pct <= 35 then
-        return unpackColor(f.criticalColor, {0.95, 0.15, 0.15})
-    elseif pct <= 70 then
-        return unpackColor(f.injuredColor, {0.95, 0.82, 0.20})
-    else
-        return unpackColor(f.healthyColor, {0.15, 0.78, 0.22})
+    local crit = f.criticalThreshold or 35
+    local inj = f.injuredThreshold or 70
+    if pct <= crit then return unpackColor(f.criticalColor, {0.95, 0.15, 0.15})
+    elseif pct <= inj then return unpackColor(f.injuredColor, {0.95, 0.82, 0.20})
+    else return unpackColor(f.healthyColor, {0.15, 0.78, 0.22}) end
+end
+
+local function getDispelColor(dtype)
+    local intel = ns.HealingIntel or {}
+    local c = (ns.DB.frame and ns.DB.frame.dispelColors and ns.DB.frame.dispelColors[dtype]) or (intel.dispelColors and intel.dispelColors[dtype])
+    if not c then
+        if dtype == "Magic" then return {0.2, 0.6, 1}
+        elseif dtype == "Curse" then return {0.6, 0, 1}
+        elseif dtype == "Poison" then return {0, 0.6, 0}
+        elseif dtype == "Disease" then return {0.6, 0.4, 0}
+        end
     end
+    return c or { 1, 0, 1 }
 end
 
 local function IsUnitInHealRange(unit)
     if not unit or not UnitExists(unit) then return false end
     if UnitIsUnit(unit, "player") or UnitIsUnit(unit, "pet") then return true end
     if UnitIsDeadOrGhost(unit) then return true end
-
     local spell = ns.SpellBook and ns.SpellBook:GetRangeSpellName()
     if spell then
         local r = ns.Compat:IsSpellInRange(spell, unit)
         if r == 1 then return true end
         if r == 0 then return false end
     end
-
     if UnitInRange and (UnitInParty(unit) or UnitInRaid(unit)) then
         local ok = UnitInRange(unit)
         if ok ~= nil then return ok and true or false end
@@ -47,191 +56,262 @@ end
 
 local function getCurableDebuff(unit)
     local intel = ns.HealingIntel or {}
-    local prio = intel.dispelPriority or {}
-    local best, firstTex
-    for i = 1, 16 do
-        local name, _, tex, _, dtype = UnitDebuff(unit, i)
-        if tex and not firstTex then firstTex = tex end
-        if name and dtype and ns.SpellBook and ns.SpellBook:PlayerCanDispel(dtype) then
+    local prio = (ns.DB.frame and ns.DB.frame.dispelPriority) or intel.dispelPriority or {"Magic", "Curse", "Poison", "Disease"}
+    local best
+    for i = 1, 40 do
+        local name, _, icon, _, dtype = UnitDebuff(unit, i)
+        if not name then break end
+        if dtype and ns.SpellBook and ns.SpellBook:PlayerCanDispel(dtype) then
             local rank = 999
             for idx, d in ipairs(prio) do if d == dtype then rank = idx break end end
-            if not best or rank < best.rank then best = { name = name, texture = tex, dtype = dtype, rank = rank } end
+            if not best or rank < best.rank then
+                best = { name = name, texture = icon, dtype = dtype, rank = rank }
+            end
         end
     end
-    if best then return best end
-    if firstTex then return { texture = firstTex } end
-    return nil
+    return best
 end
 
-local function CreateAnchor()
-    local f = CreateFrame("Frame", "PainboyAnchor", UIParent)
-    f:SetPoint("TOPLEFT", UIParent, "TOPLEFT", ns.DB.frame.x, ns.DB.frame.y)
-    f:SetMovable(true)
-    f:EnableMouse(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetClampedToScreen(true)
-    f:SetScript("OnDragStart", function(self)
-        if ns.DB.locked then return end
-        self:StartMoving()
-    end)
-    f:SetScript("OnDragStop", function(self)
-        self:StopMovingOrSizing()
-        local _, _, _, x, y = self:GetPoint()
-        ns.DB.frame.x = x
-        ns.DB.frame.y = y
-    end)
-    local bg = f:CreateTexture(nil, "BACKGROUND")
-    bg:SetAllPoints(true)
-    bg:SetTexture(0, 0, 0, 0.12)
-    f:SetScript("OnUpdate", function(_, elapsed)
-        if not (ns.DB and ns.DB.frame and ns.DB.frame.fakeMode) then return end
-        Frames.testTicker = (Frames.testTicker or 0) + elapsed
-        if Frames.testTicker < 0.12 then return end
-        Frames.testTicker = 0
-        for _, b in ipairs(Frames.buttons) do if b:IsShown() then Frames:UpdateButton(b) end end
-    end)
-    Frames.container = f
-end
+local function CreateAuraIndicator(parent, point, x, y)
+    local f = CreateFrame("Frame", nil, parent)
+    f:SetSize(14, 14)
+    f:SetPoint(point, parent, point, x, y)
+    f:EnableMouse(false)
+    
+    local icon = f:CreateTexture(nil, "ARTWORK")
+    icon:SetAllPoints()
+    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    icon:SetBlendMode("ADD")
+    f.icon = icon
+    
+    local cd = CreateFrame("Cooldown", nil, f, "CooldownFrameTemplate")
+    cd:SetAllPoints()
+    cd:SetReverse(true)
+    if cd.SetHideCountdownNumbers then cd:SetHideCountdownNumbers(true) end
+    f.cd = cd
+    
+    local count = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    count:SetPoint("BOTTOMRIGHT", 1, -1)
+    count:SetFont("Fonts\\FRIZQT__.TTF", 8, "OUTLINE")
+    f.countText = count
 
-local function CreateGroupAnchor(index)
-    local a = CreateFrame("Frame", "PainboyGroupAnchor"..index, UIParent)
-    a:SetMovable(true)
-    a:EnableMouse(true)
-    a:RegisterForDrag("LeftButton")
-    a:SetClampedToScreen(true)
-    a.index = index
-    a.label = a:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    a.label:SetPoint("TOPLEFT", 2, -2)
-    a.label:SetText("G"..index)
-    a:SetScript("OnDragStart", function(self)
-        if ns.DB.locked or ns.DB.frame.layoutMode ~= "separate" then return end
-        self:StartMoving()
-    end)
-    a:SetScript("OnDragStop", function(self)
-        self:StopMovingOrSizing()
-        local _, _, _, x, y = self:GetPoint()
-        ns.DB.groupAnchors[index] = ns.DB.groupAnchors[index] or {}
-        ns.DB.groupAnchors[index].x = x
-        ns.DB.groupAnchors[index].y = y
-    end)
-    Frames.groupAnchors[index] = a
-    return a
+    local timer = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    timer:SetPoint("CENTER", 0, 0)
+    timer:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
+    f.timerText = timer
+    
+    f:Hide()
+    return f
 end
 
 local function CreateButton(i)
-    local b = CreateFrame("Button", "PainboyUnitButton" .. i, Frames.container, "SecureUnitButtonTemplate")
+    local b = CreateFrame("Button", "PainboyUnitButton"..i, Frames.container, "SecureUnitButtonTemplate")
     b:RegisterForClicks("AnyUp")
     b:SetAttribute("type2", "target")
     b:SetAttribute("*type1", "target")
+    b.index = i
 
+    -- 1. Background (Bottom Layer)
     local bg = b:CreateTexture(nil, "BACKGROUND")
-    bg:SetAllPoints(true)
-    bg:SetTexture(0.10, 0.10, 0.10, 0.85)
+    bg:SetAllPoints()
+    bg:SetTexture(0, 0, 0, 0.95)
     b.bg = bg
 
-    local hp = CreateFrame("StatusBar", nil, b)
+    -- 1a. Border for Bars mode
+    local border = b:CreateTexture(nil, "BORDER")
+    border:SetAllPoints()
+    border:SetTexture(0, 0, 0, 1)
+    border:SetPoint("TOPLEFT", -1, 1)
+    border:SetPoint("BOTTOMRIGHT", 1, -1)
+    b.border = border
+
+    -- 1b. Inner highlight/shine
+    local shine = b:CreateTexture(nil, "OVERLAY", nil, 1)
+    shine:SetPoint("TOPLEFT", 1, -1)
+    shine:SetPoint("BOTTOMRIGHT", -1, 1)
+    shine:SetTexture(1, 1, 1, 0.08)
+    shine:SetBlendMode("ADD")
+    b.shine = shine
+
+    -- 2. Bar Container
+    local barContainer = CreateFrame("Frame", nil, b)
+    barContainer:SetAllPoints()
+    barContainer:SetFrameLevel(b:GetFrameLevel() + 1)
+    barContainer:EnableMouse(false)
+    b.barContainer = barContainer
+
+    -- 3. Health & Prediction
+    local incHeal = CreateFrame("StatusBar", nil, barContainer)
+    incHeal:SetPoint("TOPLEFT", 1, -1)
+    incHeal:SetPoint("BOTTOMRIGHT", -1, 1)
+    incHeal:SetStatusBarTexture(STATUS_BAR_TEX)
+    incHeal:SetStatusBarColor(0.2, 1.0, 0.2, 0.4)
+    b.incHeal = incHeal
+
+    local hp = CreateFrame("StatusBar", nil, barContainer)
     hp:SetPoint("TOPLEFT", 1, -1)
     hp:SetPoint("BOTTOMRIGHT", -1, 1)
-    hp:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
-    hp:SetMinMaxValues(0, 1)
-    hp:SetValue(1)
+    hp:SetStatusBarTexture(STATUS_BAR_TEX)
     b.hp = hp
 
-    local name = b:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    name:SetPoint("LEFT", b, "LEFT", 6, 0)
-    name:SetJustifyH("LEFT")
+    -- 4. Status Overlay (The Tint Fix) - Must cover the WHOLE bar
+    local overlayLayer = CreateFrame("Frame", nil, b)
+    overlayLayer:SetPoint("TOPLEFT", 1, -1)
+    overlayLayer:SetPoint("BOTTOMRIGHT", -1, 1)
+    overlayLayer:SetFrameLevel(b:GetFrameLevel() + 5)
+    overlayLayer:EnableMouse(false)
+    b.overlayLayer = overlayLayer
+
+    local overlay = overlayLayer:CreateTexture(nil, "OVERLAY")
+    overlay:SetAllPoints()
+    overlay:SetTexture(SOLID_TEX) -- Use solid white texture for smooth tinting
+    overlay:SetBlendMode("BLEND") -- Switched from ADD to BLEND for solid distinction
+    overlay:Hide()
+    b.statusOverlay = overlay
+
+    -- Textured Pattern Overlay (Visual Distinction)
+    local statusPattern = overlayLayer:CreateTexture(nil, "OVERLAY", nil, 1)
+    statusPattern:SetAllPoints()
+    statusPattern:SetTexture("Interface\\ScanningConsole\\ScanningConsole-Volumetrics") 
+    statusPattern:SetAlpha(0.25)
+    statusPattern:SetBlendMode("ADD")
+    statusPattern:Hide()
+    b.statusPattern = statusPattern
+
+    -- 5. Selection Glow (Pixel Perfect Border)
+    local glow = CreateFrame("Frame", nil, b)
+    glow:SetPoint("TOPLEFT", -1, 1)
+    glow:SetPoint("BOTTOMRIGHT", 1, -1)
+    glow:SetFrameLevel(b:GetFrameLevel() + 8)
+    glow:EnableMouse(false)
+    -- Use simple solid color borders instead of tiled backdrop textures
+    local borderTop = glow:CreateTexture(nil, "OVERLAY")
+    borderTop:SetPoint("TOPLEFT"); borderTop:SetPoint("TOPRIGHT"); borderTop:SetHeight(1)
+    local borderBottom = glow:CreateTexture(nil, "OVERLAY")
+    borderBottom:SetPoint("BOTTOMLEFT"); borderBottom:SetPoint("BOTTOMRIGHT"); borderBottom:SetHeight(1)
+    local borderLeft = glow:CreateTexture(nil, "OVERLAY")
+    borderLeft:SetPoint("TOPLEFT"); borderLeft:SetPoint("BOTTOMLEFT"); borderLeft:SetWidth(1)
+    local borderRight = glow:CreateTexture(nil, "OVERLAY")
+    borderRight:SetPoint("TOPRIGHT"); borderRight:SetPoint("BOTTOMRIGHT"); borderRight:SetWidth(1)
+    
+    glow.SetBorderColor = function(self, r, g, bl, a)
+        borderTop:SetTexture(r, g, bl, a)
+        borderBottom:SetTexture(r, g, bl, a)
+        borderLeft:SetTexture(r, g, bl, a)
+        borderRight:SetTexture(r, g, bl, a)
+    end
+    glow:Hide()
+    b.glow = glow
+
+    -- 6. Interaction Layer (Top Level)
+    local inter = CreateFrame("Frame", nil, b)
+    inter:SetAllPoints()
+    inter:SetFrameLevel(b:GetFrameLevel() + 15)
+    inter:EnableMouse(false)
+    b.inter = inter
+
+    local statusText = inter:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    statusText:SetPoint("BOTTOM", 0, 2)
+    statusText:SetFont("Fonts\\FRIZQT__.TTF", 8, "OUTLINE")
+    b.statusText = statusText
+
+    local name = inter:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    name:SetPoint("CENTER", 0, 2)
+    name:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
+    name:SetShadowOffset(1, -1)
+    name:SetTextColor(1, 1, 1)
     b.nameText = name
 
-    local value = b:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    value:SetPoint("RIGHT", b, "RIGHT", -4, 0)
-    value:SetJustifyH("RIGHT")
-    b.valueText = value
-
-    local status = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    status:SetPoint("CENTER", b, "CENTER", 0, 0)
-    status:SetJustifyH("CENTER")
-    b.statusText = status
-
     local mana = CreateFrame("StatusBar", nil, b)
-    mana:SetStatusBarTexture("Interface\TargetingFrame\UI-StatusBar")
-    mana:SetMinMaxValues(0, 1)
-    mana:SetValue(1)
+    mana:SetStatusBarTexture(STATUS_BAR_TEX)
+    mana:SetFrameLevel(b:GetFrameLevel() + 3)
     b.mana = mana
 
-    local debuff = b:CreateTexture(nil, "OVERLAY")
-    debuff:SetWidth(14)
-    debuff:SetHeight(14)
-    debuff:SetPoint("RIGHT", value, "LEFT", -3, 0)
-    b.debuffIcon = debuff
+    b.auraIndicators = {
+        topleft = CreateAuraIndicator(inter, "TOPLEFT", 2, -2),
+        topright = CreateAuraIndicator(inter, "TOPRIGHT", -2, -2),
+        bottomleft = CreateAuraIndicator(inter, "BOTTOMLEFT", 2, 2),
+        bottomright = CreateAuraIndicator(inter, "BOTTOMRIGHT", -2, 2),
+    }
 
-    local glow = b:CreateTexture(nil, "BORDER")
-    glow:SetAllPoints(true)
-    glow:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
-    glow:SetBlendMode("ADD")
-    glow:Hide()
-    b.aggro = glow
-
-    b:SetFrameStrata("HIGH")
     b:SetScript("OnEnter", function(self)
         if self.unit and UnitExists(self.unit) then
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
             GameTooltip:SetUnit(self.unit)
             GameTooltip:Show()
-        elseif self.fakeData then
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:SetText(self.fakeData.name)
-            GameTooltip:AddLine("Test mode preview", 0.8, 0.8, 0.8)
-            GameTooltip:Show()
         end
     end)
     b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
     return b
 end
 
-function Frames:GetGroupAnchor(index)
-    if not self.groupAnchors[index] then CreateGroupAnchor(index) end
-    return self.groupAnchors[index]
-end
-
-function Frames:RefreshGroupAnchors()
-    local f = ns.DB.frame
-    local width = f.width + 8
-    local height = (f.height + f.spacing) * 5 + 8
-    local perRow = math.max(1, f.groupsPerRow or 2)
-    for i = 1, 8 do
-        local a = self:GetGroupAnchor(i)
-        a:SetScale(f.scale or 1)
-        a:SetWidth(width)
-        a:SetHeight(height)
-        local saved = ns.DB.groupAnchors[i]
-        if saved and saved.x and saved.y then
-            a:ClearAllPoints()
-            a:SetPoint("TOPLEFT", UIParent, "TOPLEFT", saved.x, saved.y)
-        else
-            local row = math.floor((i - 1) / perRow)
-            local col = (i - 1) % perRow
-            a:ClearAllPoints()
-            a:SetPoint("TOPLEFT", self.container, "TOPLEFT", col * (f.width + f.groupSpacing), -row * (height + f.groupSpacing))
+function Frames:CreateAnchor()
+    if self.container then return end
+    local f = CreateFrame("Frame", "PainboyAnchor", UIParent)
+    f:SetSize(200, 100)
+    f:SetPoint("CENTER")
+    f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton")
+    f:SetScript("OnDragStart", function(s) if not ns.DB.locked then s:StartMoving() end end)
+    f:SetScript("OnDragStop", function(s) 
+        s:StopMovingOrSizing()
+        local _, _, _, x, y = s:GetPoint()
+        ns.DB.frame.x = x
+        ns.DB.frame.y = y
+    end)
+    local tex = f:CreateTexture(nil, "BACKGROUND")
+    tex:SetAllPoints(); tex:SetTexture(0,0,0,0.2)
+    f:Show()
+    self.container = f
+    
+    local ticker = 0
+    f:SetScript("OnUpdate", function(_, elap)
+        ticker = ticker + elap
+        if ticker > 0.1 then
+            ticker = 0
+            for _, b in ipairs(self.buttons) do 
+                if b:IsShown() then 
+                    self:UpdateRange(b) 
+                    if ns.DB.frame.fakeMode then self:UpdateButton(b) end
+                end 
+            end
         end
-        a.label:SetShown(not ns.DB.locked and f.layoutMode == "separate")
-        a:SetAlpha((f.layoutMode == "separate") and 1 or 0)
-        a:Show()
-    end
+    end)
 end
 
-function Frames:ApplyLayout(skipRoster)
-    if not self.container then return end
+function Frames:ApplyLayout()
+    if not self.container then self:CreateAnchor() end
     local dbf = ns.DB.frame
-    self.container:SetScale(dbf.scale or 1)
-    for _, b in ipairs(self.buttons) do
+    local isGrid = dbf.layoutStyle == "grid"
+    local cfg = isGrid and dbf.grid or dbf.bars
+    
+    self.container:SetScale(cfg.scale or 1)
+
+    for i = 1, self.MAX do
+        local b = self.buttons[i] or CreateButton(i)
+        self.buttons[i] = b
+        
+        if isGrid then
+            b:SetSize(cfg.size or 40, cfg.size or 40)
+            b.nameText:ClearAllPoints()
+            b.nameText:SetPoint("CENTER", 0, 0)
+            b.nameText:SetJustifyH("CENTER")
+            b.statusText:Hide()
+            b.border:Hide()
+            b.shine:Hide()
+        else
+            b:SetSize(cfg.width or 180, cfg.height or 22)
+            b.nameText:ClearAllPoints()
+            b.nameText:SetPoint("LEFT", 6, 0)
+            b.nameText:SetJustifyH("LEFT")
+            b.statusText:Show()
+            b.border:Show()
+            b.shine:Show()
+        end
+
         local mh = (dbf.showManaBar and (dbf.manaBarHeight or 3) or 0)
-        b:SetWidth(dbf.width)
-        b:SetHeight(dbf.height + mh)
-        b.hp:ClearAllPoints()
-        b.hp:SetPoint("TOPLEFT", 1, -1)
-        b.hp:SetPoint("BOTTOMRIGHT", -1, 1 + mh)
-        b.mana:ClearAllPoints()
         if mh > 0 then
+            b.mana:ClearAllPoints()
             b.mana:SetPoint("BOTTOMLEFT", 1, 1)
             b.mana:SetPoint("BOTTOMRIGHT", -1, 1)
             b.mana:SetHeight(mh)
@@ -239,72 +319,68 @@ function Frames:ApplyLayout(skipRoster)
         else
             b.mana:Hide()
         end
-        b.nameText:SetWidth(math.max(40, dbf.width - 56))
-        b.valueText:SetWidth(34)
-        if dbf.showHealthText then b.valueText:Show() else b.valueText:Hide() end
-        if dbf.showStatusText then b.statusText:Show() else b.statusText:Hide() end
     end
-    self:RefreshGroupAnchors()
-    if not skipRoster then self:ApplyRoster(true) end
+    self:ApplyRoster()
 end
 
-function Frames:Ensure(skipLayout)
-    if not self.container then CreateAnchor() end
-    for i = 1, self.MAX do
-        if not self.buttons[i] then self.buttons[i] = CreateButton(i) end
-    end
-    if not skipLayout then self:ApplyLayout(true) end
-end
-
-function Frames:ApplyRoster(skipEnsure)
-    if not skipEnsure then self:Ensure(true) end
+function Frames:ApplyRoster()
     local entries = ns.Roster.entries or {}
-    local shown = 0
     local dbf = ns.DB.frame
+    local isGrid = dbf.layoutStyle == "grid"
+    local cfg = isGrid and dbf.grid or dbf.bars
+    local spacing = cfg.spacing or 4
     local countInGroup = {}
 
     for i = 1, self.MAX do
         local b = self.buttons[i]
         local entry = entries[i]
         if entry then
-            shown = shown + 1
-            local group = entry.group or 1
-            countInGroup[group] = (countInGroup[group] or 0) + 1
-            local idx = countInGroup[group]
-
-            b:ClearAllPoints()
-            b.fakeData = entry.fake and entry or nil
             b.unit = entry.unit
-            if dbf.layoutMode == "separate" and group then
-                local anchor = self:GetGroupAnchor(group)
-                b:SetParent(anchor)
-                b:SetPoint("TOPLEFT", anchor, "TOPLEFT", 0, -(idx - 1) * (dbf.height + dbf.spacing))
+            b.fakeData = entry.fake and entry or nil
+            b:ClearAllPoints()
+            
+            if isGrid then
+                local cols = cfg.columns or 5
+                local col = (i - 1) % cols
+                local row = math.floor((i - 1) / cols)
+                b:SetPoint("TOPLEFT", self.container, "TOPLEFT", 8 + col * (cfg.size + spacing), -8 - row * (cfg.size + spacing))
             else
-                b:SetParent(self.container)
-                local perRow = math.max(1, dbf.groupsPerRow or 2)
-                local col = math.floor((group - 1) % perRow)
-                local row = math.floor((group - 1) / perRow)
-                local x = 8 + col * (dbf.width + dbf.groupSpacing)
-                local y = -8 - row * ((dbf.height + dbf.spacing) * 5 + dbf.groupSpacing) - (idx - 1) * (dbf.height + dbf.spacing)
+                local group = entry.group or 1
+                countInGroup[group] = (countInGroup[group] or 0) + 1
+                local perRow = cfg.groupsPerRow or 2
+                local groupSpacing = cfg.groupSpacing or 18
+                local gCol = (group - 1) % perRow
+                local gRow = math.floor((group - 1) / perRow)
+                local x = 8 + gCol * (cfg.width + groupSpacing)
+                local y = -8 - gRow * ((cfg.height + spacing) * 5 + groupSpacing) - (countInGroup[group] - 1) * (cfg.height + spacing)
                 b:SetPoint("TOPLEFT", self.container, "TOPLEFT", x, y)
             end
+            
             b:SetAttribute("unit", entry.unit)
             b:Show()
             self:UpdateButton(b)
         else
-            b.fakeData = nil
+            b:Hide()
             b.unit = nil
             b:SetAttribute("unit", nil)
-            b:Hide()
         end
     end
+end
 
-    local maxGroup = 1
-    for _, e in ipairs(entries) do if e.group and e.group > maxGroup then maxGroup = e.group end end
-    local rows = math.max(1, math.ceil(maxGroup / math.max(1, dbf.groupsPerRow or 2)))
-    self.container:SetWidth((dbf.width * math.max(1, dbf.groupsPerRow or 2)) + (dbf.groupSpacing * math.max(0, (dbf.groupsPerRow or 2) - 1)) + 16)
-    self.container:SetHeight(math.max(60, rows * ((dbf.height + dbf.spacing) * 5 + dbf.groupSpacing) + 16))
-    if ns.ClickCast then ns.ClickCast:RefreshAll() end
+local function ShortenName(name)
+    local dbf = ns.DB.frame
+    local isGrid = dbf.layoutStyle == "grid"
+    local cfg = isGrid and dbf.grid or dbf.bars
+    if not cfg.shortenNames then return name end
+    local len = math.max(4, math.min(6, tonumber(cfg.nameLength) or 6))
+    if not name or string.len(name) <= len then return name end
+    if len <= 4 then
+        return string.sub(name, 1, len)
+    elseif len == 5 then
+        return string.sub(name, 1, 4) .. "~"
+    else
+        return string.sub(name, 1, 4) .. string.sub(name, -1, -1)
+    end
 end
 
 function Frames:UpdateButton(b)
@@ -316,139 +392,72 @@ function Frames:UpdateButton(b)
     if fake then
         name = fake.name
         maxhp = 100
-        local t = GetTime() + (fake.group * 0.37)
-        hp = math.floor(25 + (math.sin(t + (string.len(name) * 0.4)) + 1) * 37.5)
+        local t = GetTime()
+        hp = math.floor(25 + (math.sin(t + (b.index or 0)*0.5) + 1) * 35)
         pct = math.floor((hp / maxhp) * 100)
-        debuff = (pct < 40 and { texture = "Interface\\Icons\\Spell_Nature_AbolishMagic", dtype = "Magic" }) or nil
-        local cc = classColors[fake.classToken]
-        if cc then b.nameText:SetTextColor(cc.r or 1, cc.g or 1, cc.b or 1) else b.nameText:SetTextColor(1,1,1) end
+        if fake.fakeDebuff then debuff = { dtype = fake.fakeDebuff } end
+        local cc = classColors[fake.classToken or "PRIEST"]
+        b.nameText:SetTextColor(cc.r, cc.g, cc.b)
     else
-        if not unit or not UnitExists(unit) then b:Hide() return end
-        name = UnitName(unit) or unit
-        hp = UnitHealth(unit) or 0
-        maxhp = UnitHealthMax(unit) or 1
-        mana = UnitMana and UnitMana(unit) or 0
-        maxmana = UnitManaMax and UnitManaMax(unit) or 0
-        if maxhp < 1 then maxhp = 1 end
+        if not unit or not UnitExists(unit) then return end
+        name, hp, maxhp = UnitName(unit), UnitHealth(unit), UnitHealthMax(unit)
+        mana, maxmana = UnitPower(unit), UnitPowerMax(unit)
+        maxhp = (maxhp > 0) and maxhp or 1
         pct = math.floor((hp / maxhp) * 100)
+        debuff = getCurableDebuff(unit)
+        local _, class = UnitClass(unit)
+        local cc = classColors[class] or {r=1, g=1, b=1}
+        b.nameText:SetTextColor(cc.r, cc.g, cc.b)
+        if UnitIsDeadOrGhost(unit) then status = "DEAD"
+        elseif not UnitIsConnected(unit) then status = "OFFLINE" end
     end
 
-    b:Show()
-    b:SetFrameLevel((self.container:GetFrameLevel() or 1) + 5)
     b.hp:SetMinMaxValues(0, maxhp)
     b.hp:SetValue(hp)
-    if b.mana and ns.DB.frame.showManaBar and maxmana and maxmana > 0 and UnitPowerType and (not unit or UnitPowerType(unit) == 0 or fake) then
-        b.mana:SetMinMaxValues(0, maxmana)
+    b.incHeal:SetMinMaxValues(0, maxhp)
+    
+    local r, g, bl = healthColor(pct)
+    b.hp:SetStatusBarColor(r, g, bl, 0.9)
+
+    -- THE FIX: Solid Color Overlay that scales perfectly
+    if debuff and debuff.dtype and dbf.highlightCurableDebuffs then
+        local dc = getDispelColor(debuff.dtype)
+        b.statusOverlay:SetVertexColor(dc[1], dc[2], dc[3], 0.45)
+        b.statusOverlay:Show()
+        b.glow:SetBorderColor(dc[1], dc[2], dc[3], 1)
+        b.glow:Show()
+    else
+        b.statusOverlay:Hide()
+        b.glow:Hide()
+    end
+
+    b.nameText:SetText(ShortenName(name))
+    b.statusText:SetText(status or (pct .. "%"))
+    
+    if b.mana:IsShown() then
+        b.mana:SetMinMaxValues(0, maxmana or 1)
         b.mana:SetValue(mana or 0)
-        b.mana:SetStatusBarColor(0.20, 0.45, 0.95, 0.95)
-        b.mana:Show()
-    elseif b.mana then
-        b.mana:Hide()
-    end
-    b.nameText:SetText(name)
-    b.valueText:SetText(dbf.showHealthText and (pct .. "%") or "")
-
-    local barR, barG, barB = 0.15, 0.78, 0.22
-    if dbf.useHealthGradient then barR, barG, barB = healthColor(pct) end
-    local borderR, borderG, borderB = 1, 0, 0
-    local showBorder = false
-
-    if fake then
-        b.bg:SetTexture(0.10, 0.10, 0.10, 0.85)
-        if debuff and dbf.highlightCurableDebuffs then
-            local c = (ns.HealingIntel and ns.HealingIntel.dispelColors and ns.HealingIntel.dispelColors[debuff.dtype]) or {1,0,1}
-            barR, barG, barB = c[1], c[2], c[3]
-            borderR, borderG, borderB = c[1], c[2], c[3]
-            showBorder = true
-            b.debuffIcon:SetTexture(debuff.texture)
-            b.debuffIcon:Show()
-        else
-            b.debuffIcon:Hide()
-        end
-    elseif UnitIsDeadOrGhost(unit) then
-        b.bg:SetTexture(0.25, 0.25, 0.25, 0.85)
-        barR, barG, barB = 0.20, 0.20, 0.20
-        b.nameText:SetTextColor(0.6, 0.6, 0.6)
-        status = "DEAD"
-    elseif not UnitIsConnected(unit) then
-        b.bg:SetTexture(0.20, 0.12, 0.12, 0.85)
-        barR, barG, barB = 0.4, 0.1, 0.1
-        b.nameText:SetTextColor(0.8, 0.4, 0.4)
-        status = "OFFLINE"
-    else
-        b.bg:SetTexture(0.10, 0.10, 0.10, 0.85)
-        if dbf.classColorNames and RAID_CLASS_COLORS and unit and UnitClass then
-            local _, class = UnitClass(unit)
-            local cc = class and RAID_CLASS_COLORS[class]
-            if cc then b.nameText:SetTextColor(cc.r, cc.g, cc.b) else b.nameText:SetTextColor(1,1,1) end
-        else
-            b.nameText:SetTextColor(1, 1, 1)
-        end
-        if UnitIsAFK and UnitIsAFK(unit) then status = "AFK" end
-        debuff = getCurableDebuff(unit)
-        if debuff and debuff.dtype and dbf.highlightCurableDebuffs then
-            local c = (ns.HealingIntel and ns.HealingIntel.dispelColors and ns.HealingIntel.dispelColors[debuff.dtype]) or {1,0,1}
-            barR, barG, barB = c[1], c[2], c[3]
-            borderR, borderG, borderB = c[1], c[2], c[3]
-            showBorder = true
-        end
-        if debuff and debuff.texture then
-            b.debuffIcon:SetTexture(debuff.texture)
-            b.debuffIcon:Show()
-        else
-            b.debuffIcon:Hide()
-        end
+        b.mana:SetStatusBarColor(0.2, 0.4, 1.0)
     end
 
-    b.hp:SetStatusBarColor(barR, barG, barB, 0.95)
-    if b.statusText then b.statusText:SetText(dbf.showStatusText and (status or "") or "") end
-
-    local isSelf = fake and false or (unit and UnitIsUnit(unit, "player"))
-    local inRange = fake and true or (isSelf and true or IsUnitInHealRange(unit))
-    if isSelf then
-        b:SetFrameStrata("DIALOG")
-        b:SetFrameLevel((self.container:GetFrameLevel() or 1) + 25)
-    else
-        b:SetFrameStrata("HIGH")
-    end
-    b:SetAlpha(inRange and 1 or (dbf.outOfRangeAlpha or 0.35))
-    local textAlpha = inRange and 1 or (dbf.outOfRangeTextAlpha or 0.55)
-    b.nameText:SetAlpha(textAlpha)
-    b.valueText:SetAlpha(textAlpha)
-    b.debuffIcon:SetAlpha(textAlpha)
-
-    local hasAggro = (not fake and UnitThreatSituation and unit) and UnitThreatSituation("player", unit)
-    if hasAggro and hasAggro >= 2 then
-        b.aggro:SetVertexColor(1, 0, 0)
-        b.aggro:Show()
-    elseif showBorder then
-        b.aggro:SetVertexColor(borderR, borderG, borderB)
-        b.aggro:Show()
-    else
-        b.aggro:Hide()
-    end
+    self:UpdateRange(b)
+    if ns.Auras then ns.Auras:UpdateButtonAuras(b) end
+    if ns.HealComm then ns.HealComm:UpdateUnit(b) end
+    if ns.ClickCast then ns.ClickCast:ApplyBindings(b) end
 end
 
-function Frames:OnEnable()
-    self:Ensure(true)
-    self:ApplyLayout(true)
-    self:ApplyRoster(true)
+function Frames:UpdateRange(b)
+    if not b.unit or b.fakeData then b:SetAlpha(1) return end
+    local inRange = IsUnitInHealRange(b.unit)
+    b:SetAlpha(inRange and 1 or (ns.DB.frame.outOfRangeAlpha or 0.35))
 end
 
-function Frames:OnEvent(event, unit)
-    if ns.DB and ns.DB.frame and ns.DB.frame.fakeMode and event ~= "PLAYER_ENTERING_WORLD" then
-        for _, b in ipairs(self.buttons) do if b:IsShown() then self:UpdateButton(b) end end
-        return
+function Frames:OnInitialize() self:CreateAnchor() end
+function Frames:OnEnable() self:ApplyLayout() end
+function Frames:OnEvent(event, unit) 
+    if event == "PLAYER_ENTERING_WORLD" or event == "PARTY_MEMBERS_CHANGED" or event == "RAID_ROSTER_UPDATE" then
+        self:ApplyLayout() 
+    elseif unit then
+        for _, b in ipairs(self.buttons) do if b.unit == unit then self:UpdateButton(b) end end
     end
-    if event == "UNIT_HEALTH" or event == "UNIT_MAXHEALTH" or event == "UNIT_AURA" or event == "UNIT_FLAGS" or event == "UNIT_CONNECTION" then
-        for _, b in ipairs(self.buttons) do
-            if b.unit == unit then self:UpdateButton(b) end
-        end
-        return
-    end
-    for _, b in ipairs(self.buttons) do if b:IsShown() then self:UpdateButton(b) end end
-end
-
-function Frames:OnLeaveCombat()
-    if self.container then self:ApplyRoster() end
 end

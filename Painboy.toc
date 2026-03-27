@@ -2,23 +2,29 @@
 ## Title: Painboy
 ## Notes: Ascension-compatible healing frames and click-casting for 3.3.5a
 ## Author: OpenAI
-## Version: 0.2.1-testing
+## Version: 2.1.0
 ## SavedVariables: PainboyDB, PainboyGlobal
-## OptionalDeps:
+
+# Utilities
 Core.lua
 Debug.lua
 Compat_335.lua
 Profiles.lua
+
+# Data
 Intelligence/Init.lua
 Intelligence/Data_Seed.lua
 Locales/enUS.lua
+
+# Modules
 SpellBook.lua
 Bindings.lua
 Roster.lua
-Frames.lua
+Auras.lua
+HealComm.lua
 ClickCast.lua
-UI_Config.lua
-UI_Bars.lua
-UI_Bindings.lua
-UI_Options.lua
+
+# UI (Must be last to ensure other modules are registered)
+Frames.lua
+UI_Main.lua
 Commands.lua

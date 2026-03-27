@@ -1,35 +1,19 @@
-
 local addonName, ns = ...
-
-_G.Painboy = ns
-ns.addonName = addonName
-ns.modules = ns.modules or {}
-ns.moduleOrder = ns.moduleOrder or {}
-ns.state = ns.state or {}
+_G.MTCHealingFrames = ns
+ns.addonName = "MTC: Healing Frames"
+ns.modules = {}
+ns.moduleOrder = {}
+ns.state = {}
 ns.L = ns.L or {}
-ns.DB = nil
 
 local frame = CreateFrame("Frame")
 ns.frame = frame
-
-local startupEvents = {
-    "PLAYER_ENTERING_WORLD",
-    "PARTY_MEMBERS_CHANGED",
-    "RAID_ROSTER_UPDATE",
-    "UNIT_HEALTH",
-    "UNIT_MAXHEALTH",
-    "UNIT_AURA",
-    "UNIT_FLAGS",
-    "UNIT_CONNECTION",
-    "LEARNED_SPELL_IN_TAB",
-    "CHARACTER_POINTS_CHANGED",
-}
 
 function ns:RegisterModule(name, mod)
     mod = mod or {}
     mod.name = name
     if not self.modules[name] then
-        self.moduleOrder[#self.moduleOrder + 1] = mod
+        table.insert(self.moduleOrder, mod)
     end
     self.modules[name] = mod
     return mod
@@ -37,62 +21,69 @@ end
 
 function ns:IterModules(method, ...)
     for _, mod in ipairs(self.moduleOrder) do
-        local fn = mod and mod[method]
-        if fn then
-            local ok, err = pcall(fn, mod, ...)
-            if not ok then
-                self:Print("Module error in " .. tostring(mod.name) .. "." .. tostring(method) .. ": " .. tostring(err))
+        if mod and mod[method] then
+            local ok, err = pcall(mod[method], mod, ...)
+            if not ok then 
+                local msg = "Module Error ["..(mod.name or "Unknown")..":"..method.."]: "..tostring(err)
+                self:Print(msg)
             end
         end
     end
 end
 
 function ns:Print(msg)
-    DEFAULT_CHAT_FRAME:AddMessage("|cff7cc7ffPainboy|r: " .. tostring(msg))
-end
-
-function ns:InCombatLockdown()
-    return InCombatLockdown and InCombatLockdown()
-end
-
-local function deepCopy(src)
-    if type(src) ~= "table" then return src end
-    local out = {}
-    for k, v in pairs(src) do
-        out[k] = deepCopy(v)
-    end
-    return out
+    DEFAULT_CHAT_FRAME:AddMessage("|cff7cc7ffMTC:HF|r: "..tostring(msg))
 end
 
 local function EnsureSaved()
     PainboyDB = PainboyDB or {}
-    PainboyDB.global = PainboyDB.global or {}
-    PainboyDB.profileKeys = PainboyDB.profileKeys or {}
     PainboyDB.profiles = PainboyDB.profiles or {}
-
-    local charName = UnitName("player") or "Unknown"
-    local realmName = GetRealmName() or "Realm"
-    local key = charName .. " - " .. realmName
-    ns.state.charKey = key
-
-    local oldProfileName = PainboyDB.profileKeys[key]
-    local defaultProfile = key
-
-    if not oldProfileName or oldProfileName == "Default" then
-        if not PainboyDB.profiles[defaultProfile] then
-            if oldProfileName == "Default" and PainboyDB.profiles.Default then
-                PainboyDB.profiles[defaultProfile] = deepCopy(PainboyDB.profiles.Default)
-            else
-                PainboyDB.profiles[defaultProfile] = {}
-            end
-        end
-        PainboyDB.profileKeys[key] = defaultProfile
-    end
-
-    local profileName = PainboyDB.profileKeys[key]
+    PainboyDB.profileKeys = PainboyDB.profileKeys or {}
+    
+    local name = UnitName("player")
+    local realm = GetRealmName()
+    local key = (name and realm) and (name.." - "..realm) or "Default"
+    
+    local profileName = PainboyDB.profileKeys[key] or "Default"
     PainboyDB.profiles[profileName] = PainboyDB.profiles[profileName] or {}
     ns.DB = PainboyDB.profiles[profileName]
-    ns.state.profileName = profileName
+    
+    -- Structure Setup
+    ns.DB.frame = ns.DB.frame or {}
+    ns.DB.bindings = ns.DB.bindings or {}
+    ns.DB.scan = ns.DB.scan or {}
+    
+    local f = ns.DB.frame
+    f.layoutStyle = f.layoutStyle or "bars"
+    
+    -- Split settings for Bars vs Grid
+    f.bars = f.bars or {
+        width = 180,
+        height = 22,
+        spacing = 4,
+        scale = 1,
+        groupsPerRow = 2,
+        groupSpacing = 18,
+        nameLength = 12,
+        shortenNames = false,
+    }
+    
+    f.grid = f.grid or {
+        size = 40,
+        columns = 5,
+        spacing = 2,
+        scale = 1,
+        nameLength = 6,
+        shortenNames = true,
+    }
+
+    f.outOfRangeAlpha = f.outOfRangeAlpha or 0.35
+    if f.highlightCurableDebuffs == nil then f.highlightCurableDebuffs = true end
+    if f.showAuraTimers == nil then f.showAuraTimers = true end
+    if f.showManaBar == nil then f.showManaBar = true end
+    if f.showHealthText == nil then f.showHealthText = true end
+    if f.showStatusText == nil then f.showStatusText = true end
+    
     PainboyGlobal = PainboyGlobal or {}
 end
 
@@ -100,29 +91,16 @@ local function Bootstrap()
     EnsureSaved()
     ns:IterModules("OnInitialize")
     ns:IterModules("OnEnable")
-    for _, ev in ipairs(startupEvents) do frame:RegisterEvent(ev) end
+    
+    local events = { "PLAYER_ENTERING_WORLD", "PARTY_MEMBERS_CHANGED", "RAID_ROSTER_UPDATE", "UNIT_HEALTH", "UNIT_MAXHEALTH", "UNIT_AURA", "UNIT_POWER", "UNIT_DISPLAYPOWER" }
+    for _, ev in ipairs(events) do frame:RegisterEvent(ev) end
 end
 
 frame:SetScript("OnEvent", function(_, event, ...)
-    if event == "ADDON_LOADED" then
-        local loaded = ...
-        if loaded == addonName then
-            frame:UnregisterEvent("ADDON_LOADED")
-            Bootstrap()
-        end
-        return
+    if event == "ADDON_LOADED" and ... == addonName then
+        Bootstrap()
+    else
+        ns:IterModules("OnEvent", event, ...)
     end
-
-    if event == "PLAYER_REGEN_DISABLED" then
-        ns.state.inCombat = true
-    elseif event == "PLAYER_REGEN_ENABLED" then
-        ns.state.inCombat = false
-        ns:IterModules("OnLeaveCombat")
-    end
-
-    ns:IterModules("OnEvent", event, ...)
 end)
-
 frame:RegisterEvent("ADDON_LOADED")
-frame:RegisterEvent("PLAYER_REGEN_DISABLED")
-frame:RegisterEvent("PLAYER_REGEN_ENABLED")
