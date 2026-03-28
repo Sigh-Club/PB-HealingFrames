@@ -8,7 +8,7 @@ local activeTab = "General"
 local tabContent = {}
 
 local function mkCheck(parent, label, tooltip, get, set)
-    local b = CreateFrame("CheckButton", "PainboyCheck"..math.random(1000,9999), parent, "InterfaceOptionsCheckButtonTemplate")
+    local b = CreateFrame("CheckButton", "PB_HF_Check"..math.random(1000,9999), parent, "InterfaceOptionsCheckButtonTemplate")
     local text = _G[b:GetName() .. "Text"]
     if text then text:SetText(label) end
     b.tooltipText = tooltip
@@ -21,7 +21,7 @@ local function mkCheck(parent, label, tooltip, get, set)
 end
 
 local function mkSlider(parent, label, minv, maxv, step, getter, setter)
-    local s = CreateFrame("Slider", "PainboySlider"..math.random(1000,9999), parent, "OptionsSliderTemplate")
+    local s = CreateFrame("Slider", "PB_HF_Slider"..math.random(1000,9999), parent, "OptionsSliderTemplate")
     s:SetWidth(150); s:SetMinMaxValues(minv, maxv); s:SetValueStep(step)
     if s.SetObeyStepOnDrag then s:SetObeyStepOnDrag(true) end
     
@@ -97,7 +97,7 @@ end
 function UI:CreateMainWindow()
     if frame then return end
 
-    frame = CreateFrame("Frame", "MTCHealingFramesConfig", UIParent)
+    frame = CreateFrame("Frame", "PB_HealingFramesConfig", UIParent)
     frame:SetSize(580, 420)
     frame:SetPoint("CENTER")
     frame:SetMovable(true); frame:EnableMouse(true); frame:RegisterForDrag("LeftButton")
@@ -109,7 +109,7 @@ function UI:CreateMainWindow()
 
     local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOPLEFT", 12, -12)
-    title:SetText("MTC: Healing Frames V 1.0 beta")
+    title:SetText("PB: Healing Frames V 1.0 beta")
 
     local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", -2, -2)
@@ -131,7 +131,7 @@ function UI:CreateMainWindow()
         btn:SetScript("OnClick", function() self:ShowTab(name) end)
         tabs[name] = btn
         
-        local scroll = CreateFrame("ScrollFrame", "PainboyTabScroll"..name, content, "UIPanelScrollFrameTemplate")
+        local scroll = CreateFrame("ScrollFrame", "PB_HF_TabScroll"..name, content, "UIPanelScrollFrameTemplate")
         scroll:SetPoint("TOPLEFT", 5, -5)
         scroll:SetPoint("BOTTOMRIGHT", -25, 5)
         scroll:Hide()
@@ -336,7 +336,7 @@ local spellPickerFrame
 local function CreateSpellPicker()
     if spellPickerFrame then return spellPickerFrame end
     
-    local f = CreateFrame("Frame", "MTCSpellPicker", UIParent)
+    local f = CreateFrame("Frame", "PB_SpellPicker", UIParent)
     f:SetSize(250, 300)
     f:SetPoint("CENTER")
     f:SetFrameStrata("DIALOG")

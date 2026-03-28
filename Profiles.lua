@@ -102,8 +102,8 @@ end
 
 function Profiles:ResetCurrentProfile()
     local name = self:GetProfileName()
-    PainboyDB.profiles[name] = deepCopy(defaults())
-    ns.DB = PainboyDB.profiles[name]
+    PB_HF_DB.profiles[name] = deepCopy(defaults())
+    ns.DB = PB_HF_DB.profiles[name]
     copyMissing(ns.DB, defaults())
 end
 

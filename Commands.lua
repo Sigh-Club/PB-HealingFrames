@@ -2,12 +2,16 @@ local _, ns = ...
 local Commands = ns:RegisterModule("Commands", {})
 ns.Commands = Commands
 
-SLASH_PAINBOY1 = "/pb"
-SLASH_PAINBOY2 = "/painboy"
+SLASH_PBHF1 = "/pb"
+SLASH_PBHF2 = "/pbhf"
 
 local function trim(s) return (s or ""):gsub("^%s+", ""):gsub("%s+$", "") end
 
-SlashCmdList["PAINBOY"] = function(msg)
+SlashCmdList["PBHF"] = function(msg)
+    if not ns or not ns.DB then 
+        print("|cff7cc7ffPB:HF|r Error: Addon database not initialized yet.")
+        return 
+    end
     msg = trim(msg:lower())
     
     if msg == "config" or msg == "" then

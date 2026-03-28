@@ -1,7 +1,7 @@
 
 local _, ns = ...
-ns = ns or _G.MTCHealingFrames or {}
-_G.MTCHealingFrames = ns
+ns = ns or _G.PB_HealingFrames or {}
+_G.PB_HealingFrames = ns
 
 local HI = ns.HealingIntel or {}
 ns.HealingIntel = HI

@@ -7,15 +7,15 @@ local function isEnabled()
 end
 
 local function LogToFile(msg)
-    if not PainboyGlobal then return end
-    PainboyGlobal.debugLog = PainboyGlobal.debugLog or {}
+    if not PB_HF_Global then return end
+    PB_HF_Global.debugLog = PB_HF_Global.debugLog or {}
     
     local timestamp = date("%Y-%m-%d %H:%M:%S")
-    table.insert(PainboyGlobal.debugLog, "[" .. timestamp .. "] " .. tostring(msg))
+    table.insert(PB_HF_Global.debugLog, "[" .. timestamp .. "] " .. tostring(msg))
     
     -- Keep log size manageable (max 1000 entries)
-    if #PainboyGlobal.debugLog > 1000 then
-        table.remove(PainboyGlobal.debugLog, 1)
+    if #PB_HF_Global.debugLog > 1000 then
+        table.remove(PB_HF_Global.debugLog, 1)
     end
 end
 

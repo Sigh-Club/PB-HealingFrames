@@ -105,7 +105,7 @@ local function CreateAuraIndicator(parent, point, x, y)
 end
 
 local function CreateButton(i)
-    local b = CreateFrame("Button", "PainboyUnitButton"..i, Frames.container, "SecureUnitButtonTemplate")
+    local b = CreateFrame("Button", "PB_HF_UnitButton"..i, Frames.container, "SecureUnitButtonTemplate")
     b:RegisterForClicks("AnyUp")
     b:SetAttribute("type2", "target")
     b:SetAttribute("*type1", "target")
@@ -248,7 +248,7 @@ end
 
 function Frames:CreateAnchor()
     if self.container then return end
-    local f = CreateFrame("Frame", "PainboyAnchor", UIParent)
+    local f = CreateFrame("Frame", "PB_HF_Anchor", UIParent)
     f:SetSize(200, 100)
     f:SetPoint("CENTER")
     f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton")
