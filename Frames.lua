@@ -478,6 +478,9 @@ function Frames:ApplyRoster()
     local cfg = isGrid and dbf.grid or dbf.bars
     local spacing = cfg.spacing or 4
     local countInGroup = {}
+    
+    local minX, maxX, minY, maxY = 0, 0, 0, 0
+    local found = false
 
     for i = 1, self.MAX do
         local b = self.buttons[i]
@@ -487,11 +490,14 @@ function Frames:ApplyRoster()
             b.fakeData = entry.fake and entry or nil
             b:ClearAllPoints()
             
+            local x, y
             if isGrid then
                 local cols = cfg.columns or 5
                 local col = (i - 1) % cols
                 local row = math.floor((i - 1) / cols)
-                b:SetPoint("TOPLEFT", self.container, "TOPLEFT", 8 + col * (cfg.size + spacing), -8 - row * (cfg.size + spacing))
+                x = 8 + col * (cfg.size + spacing)
+                y = -8 - row * (cfg.size + spacing)
+                b:SetPoint("TOPLEFT", self.container, "TOPLEFT", x, y)
             elseif dbf.splitGroups then
                 local group = entry.group or 1
                 countInGroup[group] = (countInGroup[group] or 0) + 1
@@ -504,11 +510,25 @@ function Frames:ApplyRoster()
                 local groupSpacing = cfg.groupSpacing or 18
                 local gCol = (group - 1) % perRow
                 local gRow = math.floor((group - 1) / perRow)
-                local x = 8 + gCol * (cfg.width + groupSpacing)
-                local y = -8 - gRow * ((cfg.height + spacing) * 5 + groupSpacing) - (countInGroup[group] - 1) * (cfg.height + spacing)
+                x = 8 + gCol * (cfg.width + groupSpacing)
+                y = -8 - gRow * ((cfg.height + spacing) * 5 + groupSpacing) - (countInGroup[group] - 1) * (cfg.height + spacing)
                 b:SetPoint("TOPLEFT", self.container, "TOPLEFT", x, y)
             end
             
+            -- Track bounds for master container (non-split mode)
+            if not dbf.splitGroups then
+                local bw, bh = b:GetWidth(), b:GetHeight()
+                if not found then
+                    minX, maxX, minY, maxY = x, x + bw, y - bh, y
+                    found = true
+                else
+                    minX = math.min(minX, x)
+                    maxX = math.max(maxX, x + bw)
+                    minY = math.min(minY, y - bh)
+                    maxY = math.max(maxY, y)
+                end
+            end
+
             ns:SafeSetAttribute(b, "unit", entry.unit)
             b:Show()
             self:UpdateButton(b)
@@ -517,6 +537,13 @@ function Frames:ApplyRoster()
             b.unit = nil
             ns:SafeSetAttribute(b, "unit", nil)
         end
+    end
+
+    if found and not dbf.splitGroups then
+        -- Resize container to fit all buttons + padding
+        self.container:SetSize(maxX - minX + 16, math.abs(maxY - minY) + 16)
+    elseif not dbf.splitGroups then
+        self.container:SetSize(200, 100)
     end
 end
 
