@@ -58,6 +58,22 @@ No need for external addons like Clique.
 
 ---
 
+## 📸 Gallery
+Click any screenshot to zoom in.
+
+<p align="center">
+  <a href="docs/images/raid-grid.png"><img src="docs/images/raid-grid.png" width="240" alt="Raid grid layout"/></a>
+  <a href="docs/images/player-and-bars.png"><img src="docs/images/player-and-bars.png" width="240" alt="Player and raid bars"/></a>
+  <a href="docs/images/character-bars.png"><img src="docs/images/character-bars.png" width="240" alt="Character frames"/></a>
+</p>
+<p align="center">
+  <a href="docs/images/grid-closeup.png"><img src="docs/images/grid-closeup.png" width="180" alt="Grid closeup"/></a>
+  <a href="docs/images/general-settings.png"><img src="docs/images/general-settings.png" width="240" alt="General settings"/></a>
+  <a href="docs/images/keybinds.png"><img src="docs/images/keybinds.png" width="240" alt="Keybind UI"/></a>
+</p>
+
+---
+
 ## 🤝 Share Ascension Aura Data
 Helping us keep the HoT database current is as simple as running a sampler during your dungeon or raid:
 
