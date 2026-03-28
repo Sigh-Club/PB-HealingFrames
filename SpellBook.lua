@@ -28,10 +28,12 @@ local function guessRole(slot, link)
     tooltip:SetOwner(WorldFrame, "ANCHOR_NONE")
     tooltip:ClearLines()
     
+    local ok = false
     if link then
-        tooltip:SetHyperlink(link)
-    else
-        tooltip:SetSpellBookItem(slot, "spell")
+        ok = pcall(function() tooltip:SetHyperlink(link) end)
+    end
+    if not ok then
+        pcall(function() tooltip:SetSpellBookItem(slot, "spell") end)
     end
     
     local name = GetSpellBookItemName(slot, "spell")
@@ -44,20 +46,26 @@ local function guessRole(slot, link)
     end
     
     local text = ""
-    for i = 1, tooltip:NumLines() do
-        local line = _G["GameTooltipTextLeft"..i]
-        local ltext = line and line:GetText()
-        if ltext then text = text .. " " .. lower(ltext) end
+    local numLines = tooltip:NumLines()
+    if numLines and numLines > 0 then
+        for i = 1, numLines do
+            local line = _G["GameTooltipTextLeft"..i]
+            local ltext = line and line:GetText()
+            if ltext then text = text .. " " .. lower(ltext) end
+        end
     end
 
+    -- Role Identification based on Description
     if text:find("heals") or text:find("restores.*health") or text:find("points of health") or text:find("healing") then
-        if text:find("over %d+ sec") or text:find("periodic") or text:find("each second") then return "hot" end
+        if text:find("over %d+ sec") or text:find("periodic") or text:find("each second") or text:find("every %d+ sec") then 
+            return "hot"
+        end
         return "heal"
     end
-    if text:find("absorb") or text:find("shield") then return "shield_absorb" end
-    if text:find("cleanse") or text:find("purify") or text:find("dispel") or text:find("cure") or text:find("abolish") then return "cleanse" end
-    if text:find("resurrect") or text:find("revive") or text:find("rebirth") then return "resurrection" end
-    if text:find("friendly target") or text:find("party member") or text:find("blessing") or text:find("blesses") then 
+    if text:find("absorb") or text:find("shield") or text:find("damage protection") then return "shield_absorb" end
+    if text:find("cleanse") or text:find("purify") or text:find("dispel") or text:find("cure") or text:find("abolish") or text:find("purify") then return "cleanse" end
+    if text:find("resurrect") or text:find("bring.*to life") or text:find("revive") or text:find("rebirth") then return "resurrection" end
+    if text:find("friendly target") or text:find("party member") or text:find("raid member") or text:find("armor increased") or text:find("resistance increased") or text:find("increase.*stats") or text:find("blesses") or text:find("blessing") then 
         if text:find("minutes") or text:find("hour") then return "buff" end
         return "support" 
     end
@@ -78,6 +86,17 @@ function SpellBook:Scan(force)
         return 
     end
 
+    local currentCount = 0
+    for tab = 1, tabCount do
+        local _, _, _, numSpells = ns.Compat:GetSpellTabInfo(tab)
+        currentCount = currentCount + (numSpells or 0)
+    end
+
+    if not force and currentCount == lastSpellCount and lastSpellCount > 0 then return end
+    
+    lastScan = now
+    lastSpellCount = currentCount
+    
     wipe(self.raw); wipe(self.bindable); wipe(self.byName)
     local seen = {}
     local opts = ns.DB.scan or { excludeGeneral = true, excludePassive = true, dedupeByName = true }
@@ -114,7 +133,6 @@ function SpellBook:Scan(force)
         end
     end
 
-    -- Dispel Caps
     wipe(self.dispelCapabilities)
     local intel = ns.HealingIntel or {}
     for dtype, ids in pairs(intel.dispelAbilities or {}) do
@@ -124,10 +142,8 @@ function SpellBook:Scan(force)
         end
     end
 
-    -- Range Spell
     self.rangeSpellName = nil
-    local roleOrder = {"heal", "hot", "shield_absorb", "cleanse", "support"}
-    for _, role in ipairs(roleOrder) do
+    for _, role in ipairs({"heal", "hot", "shield_absorb", "cleanse", "support"}) do
         for _, e in ipairs(self.bindable) do
             if e.role == role and ns.Compat:IsHelpfulRangeSpell(e.name) then self.rangeSpellName = e.name break end
         end
@@ -143,5 +159,5 @@ function SpellBook:Scan(force)
 end
 
 function SpellBook:OnInitialize() end
-function SpellBook:OnEnable() C_Timer.After(3, function() self:Scan(true) end) end
+function SpellBook:OnEnable() C_Timer.After(5, function() self:Scan(true) end) end
 function SpellBook:OnEvent(event) end

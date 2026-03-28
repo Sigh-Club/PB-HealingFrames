@@ -127,11 +127,28 @@ local function setUnit(btn, unit)
 end
 
 local function CreateButton(i)
-    local b = CreateFrame("Button", "PB_HF_UnitButton"..i, Frames.container, "SecureUnitButtonTemplate")
+    local b = CreateFrame("Button", "PB_HF_UnitButton"..i, Frames.container, "SecureUnitButtonTemplate,SecureHandlerEnterLeaveTemplate")
     b:RegisterForClicks("AnyUp")
     b:SetAttribute("type2", "target")
     b:SetAttribute("*type1", "target")
     b.index = i
+
+    -- Enable Mouse Wheel Support via SecureHandler (Clique style)
+    b:SetAttribute("_onenter", [=[
+        self:ClearBindings()
+        self:SetBindingClick(0, "MOUSEWHEELUP", self:GetName(), "Button6")
+        self:SetBindingClick(0, "MOUSEWHEELDOWN", self:GetName(), "Button7")
+        -- Also handle modifiers
+        self:SetBindingClick(0, "SHIFT-MOUSEWHEELUP", self:GetName(), "Shift-Button6")
+        self:SetBindingClick(0, "SHIFT-MOUSEWHEELDOWN", self:GetName(), "Shift-Button7")
+        self:SetBindingClick(0, "CTRL-MOUSEWHEELUP", self:GetName(), "Ctrl-Button6")
+        self:SetBindingClick(0, "CTRL-MOUSEWHEELDOWN", self:GetName(), "Ctrl-Button7")
+        self:SetBindingClick(0, "ALT-MOUSEWHEELUP", self:GetName(), "Alt-Button6")
+        self:SetBindingClick(0, "ALT-MOUSEWHEELDOWN", self:GetName(), "Alt-Button7")
+    ]=])
+    b:SetAttribute("_onleave", [=[
+        self:ClearBindings()
+    ]=])
 
     -- 1. Background (Bottom Layer)
     local bg = b:CreateTexture(nil, "BACKGROUND")

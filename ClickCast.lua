@@ -9,10 +9,12 @@ local buttonMap = {
     MiddleButton = "3",
     Button4 = "4",
     Button5 = "5",
+    MouseWheelUp = "6",
+    MouseWheelDown = "7",
 }
 
 local function parseSlot(slot)
-    -- slot can be "Shift-Ctrl-LeftButton"
+    -- slot can be "Shift-Ctrl-LeftButton" or "MouseWheelUp"
     local parts = { strsplit("-", slot) }
     local button = parts[#parts]
     local buttonIndex = buttonMap[button]
@@ -33,15 +35,14 @@ end
 local function clearBinding(btn, slot)
     local prefix, index = parseSlot(slot)
     if not index then return end
-    if prefix then
-        ns:SafeSetAttribute(btn, prefix .. "-type" .. index, nil)
-        ns:SafeSetAttribute(btn, prefix .. "-spell" .. index, nil)
-        ns:SafeSetAttribute(btn, prefix .. "-macrotext" .. index, nil)
-    else
-        ns:SafeSetAttribute(btn, "type" .. index, nil)
-        ns:SafeSetAttribute(btn, "spell" .. index, nil)
-        ns:SafeSetAttribute(btn, "macrotext" .. index, nil)
-    end
+    
+    local tkey = (prefix and (prefix .. "-type" .. index)) or ("type" .. index)
+    local skey = (prefix and (prefix .. "-spell" .. index)) or ("spell" .. index)
+    local mkey = (prefix and (prefix .. "-macrotext" .. index)) or ("macrotext" .. index)
+    
+    ns:SafeSetAttribute(btn, tkey, nil)
+    ns:SafeSetAttribute(btn, skey, nil)
+    ns:SafeSetAttribute(btn, mkey, nil)
 end
 
 local function applyBinding(btn, slot, data)

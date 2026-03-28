@@ -121,7 +121,7 @@ function UI:CreateMainWindow()
     local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetFont("Fonts\\FRIZQT__.TTF", 20, "OUTLINE")
     title:SetPoint("LEFT", headerIcon, "RIGHT", 10, 0)
-    title:SetText("PB: Healing Frames V 1.3.5 beta")
+    title:SetText("PB: Healing Frames V 1.3.6 beta")
 
     local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", -5, -5)
@@ -574,7 +574,7 @@ local function CreateSpellPicker()
                     
                     btn:SetScript("OnEnter", function(selfRow)
                         GameTooltip:SetOwner(selfRow, "ANCHOR_RIGHT")
-                        GameTooltip:SetSpell(spell.slot, "spell")
+                        GameTooltip:SetSpellBookItem(spell.slot, "spell")
                         GameTooltip:Show()
                     end)
                     btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -621,7 +621,7 @@ local function CreateBindCapture()
     local blocker = CreateFrame("Frame", nil, f)
     blocker:SetAllPoints(UIParent)
     blocker:SetFrameStrata("TOOLTIP")
-    blocker:SetFrameLevel(f:GetFrameLevel() + 10)
+    blocker:SetFrameLevel(f:GetFrameLevel() + 10) -- Ensure blocker is on TOP of everything
     blocker:EnableMouse(true)
     blocker:EnableMouseWheel(true)
     blocker:EnableKeyboard(true)
@@ -676,7 +676,7 @@ function UI:LoadKeybinds(c)
     captureAnchor:SetSize(350, 60); captureAnchor:SetPoint("TOPLEFT", 15, y - 30)
     c.captureAnchor = captureAnchor
 
-    y = y - 90
+    y = y - 90 -- Push buttons down further to make room for capture UI
 
     local tip = c:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     tip:SetPoint("TOPLEFT", 15, y); tip:SetText("Click + to assign a spell, X to clear, or use Auto Bind")

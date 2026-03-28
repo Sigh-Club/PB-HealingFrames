@@ -9,7 +9,7 @@ local function collectActiveAuras(unit)
     if not unit or not UnitExists(unit) then return active end
     
     -- Healer Logic for 3.3.5a / Ascension
-    -- We must iterate through all buffs (1-40) and debuffs (1-40)
+    -- Direct name matching combined with caster check
     
     -- 1. Scan Buffs
     for i = 1, 40 do
@@ -20,14 +20,8 @@ local function collectActiveAuras(unit)
         local pos = trackedNames[lname]
         
         if pos and not active[pos] then
-            local isMine = false
-            if caster then
-                if UnitIsUnit(caster, "player") or UnitIsUnit(caster, "pet") or caster == "player" or caster == "pet" then
-                    isMine = true
-                end
-            end
-
-            -- Priority Buffs (Show if mine OR special global like Beacon/Shield)
+            local isMine = caster and (UnitIsUnit(caster, "player") or UnitIsUnit(caster, "pet") or caster == "player" or caster == "pet")
+            -- Priority Globals or Player Casts
             if isMine or lname == "beacon of light" or lname == "earth shield" or lname == "sacred shield" then
                 active[pos] = { icon = icon, count = count, duration = duration, expires = expirationTime }
             end
@@ -42,7 +36,6 @@ local function collectActiveAuras(unit)
         local lname = string.lower(name)
         local pos = trackedNames[lname]
         
-        -- Always track certain debuffs in center or corners if mapped
         if pos and not active[pos] then
             active[pos] = { icon = icon, count = count, duration = duration, expires = expirationTime }
         end
@@ -55,9 +48,7 @@ function Auras:OnInitialize()
     local intel = ns.HealingIntel or {}
     wipe(trackedNames)
     for pos, list in pairs(intel.trackedAuras or {}) do
-        for _, name in ipairs(list) do 
-            trackedNames[string.lower(name)] = pos 
-        end
+        for _, name in ipairs(list) do trackedNames[string.lower(name)] = pos end
     end
 end
 
@@ -93,8 +84,6 @@ function Auras:UpdateButtonAuras(btn, cached)
         end
     elseif btn.unit then
         active = active or collectActiveAuras(btn.unit)
-        
-        -- Center icon fallback: show current curable debuff if no center aura tracked
         if not active.center and btn.curableDebuff then
             local d = btn.curableDebuff
             active.center = { icon = d.texture, count = d.count or 0, duration = d.duration or 0, expires = d.expires or 0 }
@@ -106,45 +95,29 @@ function Auras:UpdateButtonAuras(btn, cached)
         if data then
             ind.icon:SetTexture(data.icon)
             ind.countText:SetText((data.count and data.count > 1) and data.count or "")
-            
             if data.duration and data.duration > 0 and data.expires and data.expires > 0 then
                 ind.cd:SetCooldown(data.expires - data.duration, data.duration)
                 ind.cd:Show()
-                
                 ind:SetScript("OnUpdate", function(selfIndicator, _)
-                    if not ns.DB.frame.showAuraTimers then
-                        selfIndicator.timerText:SetText("")
-                        return
-                    end
+                    if not ns.DB.frame.showAuraTimers then selfIndicator.timerText:SetText(""); return end
                     local remain = data.expires - GetTime()
                     if remain <= 0 then
                         selfIndicator.timerText:SetText("")
                         selfIndicator:SetScript("OnUpdate", nil)
                     else
-                        if remain < 2.5 then
-                            selfIndicator.timerText:SetTextColor(1, 0.1, 0.1)
-                        elseif remain < 5 then
-                            selfIndicator.timerText:SetTextColor(1, 0.8, 0)
-                        else
-                            selfIndicator.timerText:SetTextColor(1, 1, 1)
-                        end
-                        
-                        if remain > 10 then
-                            selfIndicator.timerText:SetText(math.floor(remain))
-                        else
-                            selfIndicator.timerText:SetText(string.format("%.1f", remain))
-                        end
+                        if remain < 2.5 then selfIndicator.timerText:SetTextColor(1, 0.1, 0.1)
+                        elseif remain < 5 then selfIndicator.timerText:SetTextColor(1, 0.8, 0)
+                        else selfIndicator.timerText:SetTextColor(1, 1, 1) end
+                        if remain > 10 then selfIndicator.timerText:SetText(math.floor(remain))
+                        else selfIndicator.timerText:SetText(string.format("%.1f", remain)) end
                     end
                 end)
             else
-                ind.cd:Hide()
-                ind.timerText:SetText("")
-                ind:SetScript("OnUpdate", nil)
+                ind.cd:Hide(); ind.timerText:SetText(""); ind:SetScript("OnUpdate", nil)
             end
             ind:Show()
         else
-            ind:Hide()
-            ind:SetScript("OnUpdate", nil)
+            ind:Hide(); ind:SetScript("OnUpdate", nil)
         end
     end
 end
@@ -153,7 +126,9 @@ function Auras:OnEvent(event, unit)
     if event == "UNIT_AURA" then
         if not ns.Frames or not ns.Frames.buttons then return end
         for _, b in ipairs(ns.Frames.buttons) do
-            if b.unit == unit then self:UpdateButtonAuras(b) end
+            if b.unit and unit and UnitIsUnit(b.unit, unit) then 
+                self:UpdateButtonAuras(b) 
+            end
         end
     end
 end
