@@ -115,8 +115,8 @@ function UI:CreateMainWindow()
 
     local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetFont("Fonts\\FRIZQT__.TTF", 20, "OUTLINE")
-    title:SetPoint("TOP", 0, -15)
-    title:SetText("PB: Healing Frames V 1.3.0 beta")
+    title:SetPoint("TOPLEFT", 20, -15)
+    title:SetText("PB: Healing Frames V 1.3.1 beta")
 
     local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", -5, -5)
@@ -149,18 +149,18 @@ function UI:CreateMainWindow()
     local tabList = { "General", "Layout", "Style", "Keybinds", "Profiles" }
     for i, name in ipairs(tabList) do
         local btn = CreateFrame("Button", nil, sidebar, "UIPanelButtonTemplate")
-        btn:SetSize(140, 32); btn:SetPoint("TOP", 0, -15 - (i-1) * 38)
+        btn:SetSize(160, 36); btn:SetPoint("TOP", 0, -20 - (i-1) * 42)
         btn:SetText(name)
         btn:SetScript("OnClick", function() self:ShowTab(name) end)
         tabs[name] = btn
         
         local scroll = CreateFrame("ScrollFrame", "PB_HF_TabScroll"..name, content, "UIPanelScrollFrameTemplate")
-        scroll:SetPoint("TOPLEFT", 10, -10)
-        scroll:SetPoint("BOTTOMRIGHT", -30, 10)
+        scroll:SetPoint("TOPLEFT", 15, -15)
+        scroll:SetPoint("BOTTOMRIGHT", -35, 15)
         scroll:Hide()
         
         local child = CreateFrame("Frame", nil, scroll)
-        child:SetSize(520, 1000)
+        child:SetSize(580, 1200)
         scroll:SetScrollChild(child)
         
         tabContent[name] = { scroll = scroll, child = child }
@@ -283,7 +283,7 @@ function UI:LoadLayout(c)
     c.bWidth:SetPoint("TOPLEFT", 280, y - 40); c.bWidth:SetWidth(180); y = y - 85
 
     c.bHeight = mkSlider(c, "Height", 10, 120, 1, function() return ns.DB.frame.bars.height or 22 end, function(v) ns.DB.frame.bars.height = v end)
-    c.bHeight:SetPoint("TOPLEFT", 15, y); c.bHeight:SetWidth(180)
+    bHeight = c.bHeight; bHeight:SetPoint("TOPLEFT", 15, y); bHeight:SetWidth(180)
 
     c.bSpacing = mkSlider(c, "Spacing", 0, 40, 1, function() return ns.DB.frame.bars.spacing or 4 end, function(v) ns.DB.frame.bars.spacing = v end)
     c.bSpacing:SetPoint("TOPLEFT", 280, y); c.bSpacing:SetWidth(180); y = y - 65
@@ -384,7 +384,7 @@ function UI:LoadStyle(c)
     mkCheck(c, "Inverted (Deficit)", "Show health deficit instead of full bar.", 
         function() return ns.DB.frame.invertedColors end, function(v) ns.DB.frame.invertedColors = v end):SetPoint("TOPLEFT", 15, y); y = y - 32
 
-    mkColorButton(c, "Hover Color", function() return ns.DB.frame.hoverColor or {1, 1, 1, 0.15} end, function(v) ns.DB.frame.hoverColor = v end):SetPoint("TOPLEFT", 15, y); y = y - 40
+    mkColorButton(c, "Hover Color", function() return ns.DB.frame.hoverColor or {1, 1, 1, 0.15} end, function(v) ns.DB.frame.hoverColor = v end):SetPoint("TOPLEFT", 15, y); y = y - 45
 
     local textures = {
         { name = "Classic", path = "Interface\\TargetingFrame\\UI-StatusBar" },
@@ -439,15 +439,10 @@ local function CreateSpellPicker()
     local f = CreateFrame("Frame", "PB_SpellPicker", UIParent)
     f:SetSize(450, 500)
     f:SetPoint("CENTER")
-    f:SetFrameStrata("DIALOG")
+    f:SetFrameStrata("TOOLTIP") -- Higher strata to be on top
     f:Hide()
-    f:SetBackdrop({
-        bgFile = "Interface\\ChatFrame\\ChatFrameBackground",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        tile = true, tileSize = 16, edgeSize = 12,
-        insets = { left = 3, right = 3, top = 3, bottom = 3 }
-    })
-    f:SetBackdropColor(0.1, 0.1, 0.1, 0.95)
+    CreateFrameBackdrop(f)
+    f:SetBackdropColor(0.05, 0.05, 0.05, 0.98)
     
     local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     title:SetPoint("TOPLEFT", 20, -20)
@@ -455,85 +450,66 @@ local function CreateSpellPicker()
     f.title = title
     
     local categories = { "All", "Healing", "Support", "Buffs", "Cleanse", "Res" }
-    f.catButtons = {}
-    for i, cat in ipairs(categories) do
-        local b = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-        b:SetSize(65, 24)
-        b:SetPoint("TOPLEFT", 20 + (i-1)*68, -50)
-        b:SetText(cat)
-        b:SetScript("OnClick", function()
-            f.currentCategory = cat
-            f:UpdateSpellList(f.editbox:GetText():lower())
-            for _, btn in ipairs(f.catButtons) do btn:UnlockHighlight() end
-            b:LockHighlight()
-        end)
-        f.catButtons[i] = b
-    end
+    f.currentCategoryIdx = 1
+    
+    local catBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+    catBtn:SetSize(120, 24)
+    catBtn:SetPoint("TOPLEFT", 20, -50)
+    catBtn:SetText("Filter: All")
+    catBtn:SetScript("OnClick", function()
+        f.currentCategoryIdx = (f.currentCategoryIdx % #categories) + 1
+        local cat = categories[f.currentCategoryIdx]
+        catBtn:SetText("Filter: " .. cat)
+        f.currentCategory = cat
+        f:UpdateSpellList(f.editbox:GetText():lower())
+    end)
     f.currentCategory = "All"
-    f.catButtons[1]:LockHighlight()
 
     local filterLabel = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    filterLabel:SetPoint("TOPLEFT", 20, -90)
-    filterLabel:SetText("Filter:")
+    filterLabel:SetPoint("LEFT", catBtn, "RIGHT", 15, 0)
+    filterLabel:SetText("Search:")
     
-    local editbox = CreateFrame("EditBox", nil, f)
-    editbox:SetSize(250, 24)
-    editbox:SetPoint("LEFT", filterLabel, "RIGHT", 10, 0)
-    editbox:SetFontObject("ChatFontNormal")
-    editbox:SetText("")
-    editbox:SetAutoFocus(false)
+    local editbox = CreateFrame("EditBox", "PB_SpellPickerFilter", f, "InputBoxTemplate")
+    editbox:SetSize(180, 22); editbox:SetPoint("LEFT", filterLabel, "RIGHT", 10, 0); editbox:SetAutoFocus(false)
     f.editbox = editbox
     
-    local scroll = CreateFrame("ScrollFrame", nil, f, "UIPanelScrollFrameTemplate")
-    scroll:SetPoint("TOPLEFT", 20, -125)
+    local scroll = CreateFrame("ScrollFrame", "PB_SpellPickerScroll", f, "UIPanelScrollFrameTemplate")
+    scroll:SetPoint("TOPLEFT", 20, -90)
     scroll:SetPoint("BOTTOMRIGHT", -40, 50)
     
     local child = CreateFrame("Frame", nil, scroll)
     child:SetSize(380, 1000)
     scroll:SetScrollChild(child)
     f.scrollChild = child
-    f.scroll = scroll
     
     editbox:SetScript("OnTextChanged", function(self)
-        local txt = self:GetText():lower()
-        f:UpdateSpellList(txt)
+        f:UpdateSpellList(self:GetText():lower())
     end)
     
     local closeBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-    closeBtn:SetSize(80, 24)
-    closeBtn:SetPoint("BOTTOMRIGHT", -20, -15)
-    closeBtn:SetText("Close")
+    closeBtn:SetSize(80, 24); closeBtn:SetPoint("BOTTOMRIGHT", -20, -15); closeBtn:SetText("Close")
     closeBtn:SetScript("OnClick", function() f:Hide() end)
     
     local targetBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-    targetBtn:SetSize(80, 24)
-    targetBtn:SetPoint("RIGHT", closeBtn, "LEFT", -10, 0)
-    targetBtn:SetText("Target")
+    targetBtn:SetSize(80, 24); targetBtn:SetPoint("RIGHT", closeBtn, "LEFT", -10, 0); targetBtn:SetText("Target")
     targetBtn:SetScript("OnClick", function()
         ns.Bindings:SetTarget(f.currentSlot)
-        if ns.UI_Main then ns.UI_Main:RefreshKeybinds() end
         f:Hide()
     end)
-    f.targetBtn = targetBtn
     
     local menuBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-    menuBtn:SetSize(70, 24)
-    menuBtn:SetPoint("RIGHT", targetBtn, "LEFT", -10, 0)
-    menuBtn:SetText("Menu")
+    menuBtn:SetSize(70, 24); menuBtn:SetPoint("RIGHT", targetBtn, "LEFT", -10, 0); menuBtn:SetText("Menu")
     menuBtn:SetScript("OnClick", function()
         ns.Bindings:SetMenu(f.currentSlot)
-        if ns.UI_Main then ns.UI_Main:RefreshKeybinds() end
         f:Hide()
     end)
-    f.menuBtn = menuBtn
     
-    spellPickerFrame = f
     f.buttons = {}
     
     f.Open = function(self, slot, parent)
         self.currentSlot = slot
         self:ClearAllPoints()
-        self:SetPoint("LEFT", parent, "RIGHT", 20, 0)
+        self:SetPoint("CENTER")
         self.title:SetText("Assign: " .. slot)
         self:Show()
         self.editbox:SetText("")
@@ -541,22 +517,17 @@ local function CreateSpellPicker()
     end
     
     f.UpdateSpellList = function(self, filter)
-        local child = self.scrollChild
         local bindable = (ns.SpellBook and ns.SpellBook.GetBindable and ns.SpellBook:GetBindable()) or {}
         local intel = ns.HealingIntel or {}
+        local count, y, cat = 0, 0, self.currentCategory
         
         for _, btn in ipairs(self.buttons) do btn:Hide() end
         
-        local count = 0
-        local y = 0
-        local cat = self.currentCategory
-        
-        for i, spell in ipairs(bindable) do
+        for _, spell in ipairs(bindable) do
             local name = spell.name:lower()
-            local role = spell.role
-            
             local inCat = (cat == "All")
             if not inCat then
+                local role = spell.role
                 if cat == "Healing" and intel.healingRoles and intel.healingRoles[role] then inCat = true
                 elseif cat == "Support" and intel.supportRoles and intel.supportRoles[role] then inCat = true
                 elseif cat == "Buffs" and role == "buff" then inCat = true
@@ -569,23 +540,14 @@ local function CreateSpellPicker()
                 count = count + 1
                 local btn = self.buttons[count]
                 if not btn then
-                    btn = CreateFrame("Button", nil, child, "UIPanelButtonTemplate")
-                    btn:SetSize(370, 26)
-                    btn:SetText("")
-                    
-                    local icon = btn:CreateTexture(nil, "OVERLAY")
-                    icon:SetSize(22, 22)
-                    icon:SetPoint("LEFT", 5, 0)
-                    btn.icon = icon
-                    
-                    local t = btn:GetFontString()
-                    t:ClearAllPoints()
-                    t:SetPoint("LEFT", icon, "RIGHT", 10, 0)
-                    t:SetJustifyH("LEFT")
-                    
+                    btn = CreateFrame("Button", nil, self.scrollChild, "UIPanelButtonTemplate")
+                    btn:SetSize(370, 26); btn:SetText("")
+                    btn.icon = btn:CreateTexture(nil, "OVERLAY")
+                    btn.icon:SetSize(22, 22); btn.icon:SetPoint("LEFT", 5, 0)
+                    btn:GetFontString():SetPoint("LEFT", btn.icon, "RIGHT", 10, 0)
+                    btn:GetFontString():SetJustifyH("LEFT")
                     btn:SetScript("OnClick", function()
                         ns.Bindings:SetSpell(self.currentSlot, spell.name)
-                        if ns.UI_Main then ns.UI_Main:RefreshKeybinds() end
                         self:Hide()
                     end)
                     self.buttons[count] = btn
@@ -597,16 +559,10 @@ local function CreateSpellPicker()
                 y = y + 28
             end
         end
-        
-        if count == 0 then
-            local nofit = child:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-            nofit:SetPoint("TOPLEFT", 5, 0)
-            nofit:SetText("No spells found.")
-        end
-        
-        child:SetHeight(math.max(y, 100))
+        self.scrollChild:SetHeight(math.max(y, 100))
     end
     
+    spellPickerFrame = f
     return f
 end
 
@@ -617,61 +573,64 @@ local function CreateBindCapture()
     
     local f = CreateFrame("Frame", "PB_BindCapture", UIParent)
     f:SetSize(300, 80)
-    f:SetFrameStrata("TOOLTIP") -- Highest strata
+    f:SetFrameStrata("TOOLTIP")
     f:Hide()
     CreateFrameBackdrop(f)
     f:SetBackdropColor(0.1, 0.1, 0.1, 0.95)
     
     local txt = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    txt:SetPoint("TOP", 0, -15)
-    txt:SetText("Waiting for input...")
+    txt:SetPoint("TOP", 0, -15); txt:SetText("Waiting for input...")
     f.txt = txt
 
     local help = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    help:SetPoint("TOP", txt, "BOTTOM", 0, -5)
-    help:SetText("Press Mouse, Wheel, or Key")
-    f.help = help
+    help:SetPoint("TOP", txt, "BOTTOM", 0, -5); help:SetText("Press Mouse, Wheel, or Key")
     
     local cancel = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
     cancel:SetSize(80, 20); cancel:SetPoint("BOTTOM", 0, 10); cancel:SetText("Cancel")
     cancel:SetScript("OnClick", function() f:Hide() end)
     
-    -- Full-screen input blocker
     local blocker = CreateFrame("Frame", nil, f)
     blocker:SetAllPoints(UIParent)
-    blocker:SetFrameLevel(f:GetFrameLevel() - 1)
+    blocker:SetFrameStrata("TOOLTIP")
+    blocker:SetFrameLevel(f:GetFrameLevel() + 10) -- Ensure blocker is on TOP of everything
     blocker:EnableMouse(true)
+    blocker:EnableMouseWheel(true)
     blocker:EnableKeyboard(true)
     
-    blocker:SetScript("OnMouseDown", function(self, button)
+    local function finish(slot)
+        f:Hide()
+        blocker:Hide()
+        if f.callback then f.callback(slot) end
+    end
+
+    blocker:SetScript("OnMouseDown", function(_, button)
         local mods = ""
         if IsShiftKeyDown() then mods = mods .. "Shift-" end
         if IsControlKeyDown() then mods = mods .. "Ctrl-" end
         if IsAltKeyDown() then mods = mods .. "Alt-" end
-        f:Hide()
-        if f.callback then f.callback(mods .. button) end
+        finish(mods .. button)
     end)
 
-    blocker:SetScript("OnMouseWheel", function(self, delta)
+    blocker:SetScript("OnMouseWheel", function(_, delta)
         local mods = ""
         if IsShiftKeyDown() then mods = mods .. "Shift-" end
         if IsControlKeyDown() then mods = mods .. "Ctrl-" end
         if IsAltKeyDown() then mods = mods .. "Alt-" end
-        local button = (delta > 0) and "MouseWheelUp" or "MouseWheelDown"
-        f:Hide()
-        if f.callback then f.callback(mods .. button) end
+        finish(mods .. ((delta > 0) and "MouseWheelUp" or "MouseWheelDown"))
     end)
 
-    blocker:SetScript("OnKeyDown", function(self, key)
-        if key == "ESCAPE" then f:Hide(); return end
-        if key == "LSHIFT" or key == "RSHIFT" or key == "LCTRL" or key == "RCTRL" or key == "LALT" or key == "RALT" then return end
+    blocker:SetScript("OnKeyDown", function(_, key)
+        if key == "ESCAPE" then f:Hide(); blocker:Hide(); return end
+        if key:find("SHIFT") or key:find("CTRL") or key:find("ALT") then return end
         local mods = ""
         if IsShiftKeyDown() then mods = mods .. "Shift-" end
         if IsControlKeyDown() then mods = mods .. "Ctrl-" end
         if IsAltKeyDown() then mods = mods .. "Alt-" end
-        f:Hide()
-        if f.callback then f.callback(mods .. key) end
+        finish(mods .. key)
     end)
+    
+    f:SetScript("OnShow", function() blocker:Show() end)
+    f:SetScript("OnHide", function() blocker:Hide() end)
     
     bindCaptureFrame = f
     return f
@@ -684,13 +643,11 @@ function UI:LoadKeybinds(c)
     local title = c:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOPLEFT", 15, y); title:SetText("Keybinds")
     
-    -- Location where the capture UI will be anchored
     local captureAnchor = CreateFrame("Frame", nil, c)
-    captureAnchor:SetSize(300, 80)
-    captureAnchor:SetPoint("TOPLEFT", title, "TOPRIGHT", 20, 10)
+    captureAnchor:SetSize(350, 60); captureAnchor:SetPoint("TOPLEFT", 15, y - 30)
     c.captureAnchor = captureAnchor
 
-    y = y - 45
+    y = y - 90 -- Push buttons down further to make room for capture UI
 
     local tip = c:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     tip:SetPoint("TOPLEFT", 15, y); tip:SetText("Click + to assign a spell, X to clear, or use Auto Bind")
@@ -704,8 +661,7 @@ function UI:LoadKeybinds(c)
     addBind:SetSize(160, 28); addBind:SetPoint("LEFT", smart, "RIGHT", 15, 0); addBind:SetText("Add Binding")
     addBind:SetScript("OnClick", function()
         local capture = CreateBindCapture()
-        capture:ClearAllPoints()
-        capture:SetPoint("CENTER", captureAnchor, "CENTER", 0, 0)
+        capture:ClearAllPoints(); capture:SetPoint("CENTER", captureAnchor, "CENTER", 0, 0)
         capture.callback = function(slot)
             if not spellPickerFrame then CreateSpellPicker() end
             spellPickerFrame:Open(slot, addBind)
@@ -745,42 +701,26 @@ function UI:RefreshKeybinds()
         local row = content.keyRows[i]
         if not row then
             row = CreateFrame("Frame", nil, content)
-            row:SetSize(550, 32)
-            row:SetPoint("TOPLEFT", 15, y - (i-1) * 34)
-            
+            row:SetSize(550, 32); row:SetPoint("TOPLEFT", 15, y - (i-1) * 34)
             row.txt = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
             row.txt:SetPoint("LEFT", 5, 0)
-            
             row.spell = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-            row.spell:SetPoint("LEFT", 160, 0)
-            row.spell:SetWidth(350)
-            
+            row.spell:SetPoint("LEFT", 160, 0); row.spell:SetWidth(350)
             local plus = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
             plus:SetSize(32, 24); plus:SetPoint("RIGHT", -5, 0); plus:SetText("+")
             row.plus = plus
-            
             local clr = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
             clr:SetSize(32, 24); clr:SetPoint("RIGHT", plus, "LEFT", -5, 0); clr:SetText("X")
             row.clr = clr
-            
             content.keyRows[i] = row
         end
-        
         row.txt:SetText(slot)
         local rec = ns.Bindings:Get(slot)
         local text = rec.value or ""
         if text == "" then text = "|cff888888-- " .. rec.type .. " --|r" end
         row.spell:SetText(text)
-        
-        row.plus:SetScript("OnClick", function()
-            spellPickerFrame:Open(slot, row)
-        end)
-        
-        row.clr:SetScript("OnClick", function()
-            ns.Bindings:Clear(slot)
-            self:RefreshKeybinds()
-        end)
-
+        row.plus:SetScript("OnClick", function() spellPickerFrame:Open(slot, row) end)
+        row.clr:SetScript("OnClick", function() ns.Bindings:Clear(slot); self:RefreshKeybinds() end)
         row:Show()
     end
 end
@@ -836,7 +776,6 @@ function UI:RefreshProfiles(c)
     end
     
     c.activeProfileText:SetText(ns.Profiles:GetProfileName())
-    
     local profiles = ns.Profiles:GetProfiles()
     local y = c.profileY
     
@@ -847,44 +786,29 @@ function UI:RefreshProfiles(c)
         local row = c.profileRows[i]
         if not row then
             row = CreateFrame("Frame", nil, c)
-            row:SetSize(500, 30)
-            row:SetPoint("TOPLEFT", 15, y - (i-1) * 32)
-            
+            row:SetSize(500, 30); row:SetPoint("TOPLEFT", 15, y - (i-1) * 32)
             row.name = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
             row.name:SetPoint("LEFT", 5, 0)
-            
             local setBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
             setBtn:SetSize(80, 22); setBtn:SetPoint("RIGHT", -180, 0); setBtn:SetText("Select")
             row.setBtn = setBtn
-            
             local copyBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-            copyBtn:SetSize(80, 22); copyBtn:SetPoint("LEFT", setBtn, "RIGHT", 5, 0); copyBtn:SetText("Copy To")
+            copyBtn:SetSize(80, 22); copyBtn:SetPoint("LEFT", setBtn, "RIGHT", 5, 0); copyBtn:SetText("Copy From")
             row.copyBtn = copyBtn
-            
             local delBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
             delBtn:SetSize(80, 22); delBtn:SetPoint("LEFT", copyBtn, "RIGHT", 5, 0); delBtn:SetText("Delete")
             row.delBtn = delBtn
-            
             c.profileRows[i] = row
         end
-        
         row.name:SetText(name)
-        
         row.setBtn:SetScript("OnClick", function()
             ns.Profiles:SetProfile(name)
             self:RefreshProfiles(c)
-            -- Refresh other tabs if they are loaded
             for tName, data in pairs(tabContent) do
-                if data.child.loaded and tName ~= "Profiles" then
-                    data.child.loaded = false -- Force reload when switching back
-                end
+                if data.child.loaded and tName ~= "Profiles" then data.child.loaded = false end
             end
         end)
-        
         row.copyBtn:SetScript("OnClick", function()
-            -- Logic to copy current profile TO this profile? 
-            -- Usually it's "Copy FROM"
-            -- Let's change it to "Copy From" this profile to CURRENT
             StaticPopupDialogs["PB_HF_COPY_PROFILE"] = {
                 text = "Copy settings from '"..name.."' to current profile?",
                 button1 = "Yes", button2 = "No",
@@ -896,33 +820,12 @@ function UI:RefreshProfiles(c)
             }
             StaticPopup_Show("PB_HF_COPY_PROFILE")
         end)
-        row.copyBtn:SetText("Copy From")
-        
         row.delBtn:SetScript("OnClick", function()
-            if name == "Default" or name == ns.Profiles:GetProfileName() then
-                ns:Print("Cannot delete the Default or active profile.")
-                return
-            end
-            ns.Profiles:DeleteProfile(name)
-            self:RefreshProfiles(c)
+            if name == "Default" or name == ns.Profiles:GetProfileName() then return end
+            ns.Profiles:DeleteProfile(name); self:RefreshProfiles(c)
         end)
-        
-        -- Disable delete for Default and Active
-        if name == "Default" or name == ns.Profiles:GetProfileName() then
-            row.delBtn:Disable()
-        else
-            row.delBtn:Enable()
-        end
-        
-        -- Highlight active
-        if name == ns.Profiles:GetProfileName() then
-            row.name:SetTextColor(1, 0.8, 0)
-            row.setBtn:Disable()
-        else
-            row.name:SetTextColor(1, 1, 1)
-            row.setBtn:Enable()
-        end
-        
+        if name == "Default" or name == ns.Profiles:GetProfileName() then row.delBtn:Disable() else row.delBtn:Enable() end
+        if name == ns.Profiles:GetProfileName() then row.name:SetTextColor(1, 0.8, 0); row.setBtn:Disable() else row.name:SetTextColor(1, 1, 1); row.setBtn:Enable() end
         row:Show()
     end
 end
