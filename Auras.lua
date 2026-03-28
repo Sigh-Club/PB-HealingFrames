@@ -2,22 +2,21 @@ local _, ns = ...
 local Auras = ns:RegisterModule("Auras", {})
 ns.Auras = Auras
 
-local positionMap = {}
+local trackedNames = {}
 
 local function collectActiveAuras(unit)
     local active = {}
     if not unit or not UnitExists(unit) then return active end
     
-    -- Helpful (Buffs) - using UnitBuff for clarity in 3.3.5a
-    for i = 1, 40 do
-        local name, _, icon, count, _, duration, expirationTime, caster = UnitBuff(unit, i)
-        if not name then break end
-        
-        local lname = string.lower(name)
-        local pos = positionMap[lname]
-        
-        if pos and not active[pos] then
-            -- Robust caster check for 3.3.5a / Ascension
+    -- In 3.3.5a, direct name access is more reliable for tracked spells
+    for lname, pos in pairs(trackedNames) do
+        -- Check Buffs/Debuffs by Name
+        local name, _, icon, count, _, duration, expirationTime, caster = UnitBuff(unit, lname)
+        if not name then
+            name, _, icon, count, _, duration, expirationTime, caster = UnitDebuff(unit, lname)
+        end
+
+        if name then
             local isMine = false
             if caster then
                 if UnitIsUnit(caster, "player") or UnitIsUnit(caster, "pet") or caster == "player" or caster == "pet" then
@@ -25,28 +24,10 @@ local function collectActiveAuras(unit)
                 end
             end
 
-            -- Special high-priority buffs tracked regardless of caster (but usually ours)
+            -- High Priority Globals or Player Casts
             if isMine or lname == "beacon of light" or lname == "earth shield" or lname == "sacred shield" then
                 active[pos] = { icon = icon, count = count, duration = duration, expires = expirationTime }
             end
-        end
-    end
-    
-    -- Harmful (Debuffs) - using UnitDebuff
-    for i = 1, 40 do
-        local name, _, icon, count, _, duration, expirationTime = UnitDebuff(unit, i)
-        if not name then break end
-        
-        local lname = string.lower(name)
-        -- Tracking specific debuffs for corners if mapped
-        local pos = positionMap[lname]
-        if pos and not active[pos] then
-            active[pos] = { icon = icon, count = count, duration = duration, expires = expirationTime }
-        end
-        
-        -- Also check if it belongs in center (tracked debuffs)
-        if pos == "center" and not active.center then
-            active.center = { icon = icon, count = count, duration = duration, expires = expirationTime }
         end
     end
     
@@ -56,7 +37,7 @@ end
 function Auras:OnInitialize()
     local intel = ns.HealingIntel or {}
     for pos, list in pairs(intel.trackedAuras or {}) do
-        for _, name in ipairs(list) do positionMap[string.lower(name)] = pos end
+        for _, name in ipairs(list) do trackedNames[string.lower(name)] = pos end
     end
 end
 
@@ -87,14 +68,11 @@ function Auras:UpdateButtonAuras(btn, cached)
             local expires = t + (dur - ((t + offset) % dur))
             active.bottomright = { icon = "Interface\\Icons\\Spell_Nature_HealingWave", count = 0, duration = dur, expires = expires }
         end
-        
         if (group == 5) then
             active.center = { icon = "Interface\\Icons\\Spell_Shadow_ShadowWordPain", count = 0, duration = 30, expires = t + 15 }
         end
     elseif btn.unit then
         active = active or collectActiveAuras(btn.unit)
-        
-        -- Center icon fallback: show current curable debuff if no center aura tracked
         if not active.center and btn.curableDebuff then
             local d = btn.curableDebuff
             active.center = { icon = d.texture, count = d.count or 0, duration = d.duration or 0, expires = d.expires or 0 }
@@ -106,52 +84,35 @@ function Auras:UpdateButtonAuras(btn, cached)
         if data then
             ind.icon:SetTexture(data.icon)
             ind.countText:SetText((data.count and data.count > 1) and data.count or "")
-            
             if data.duration and data.duration > 0 and data.expires and data.expires > 0 then
                 ind.cd:SetCooldown(data.expires - data.duration, data.duration)
                 ind.cd:Show()
-                
                 ind:SetScript("OnUpdate", function(selfIndicator, _)
-                    if not ns.DB.frame.showAuraTimers then
-                        selfIndicator.timerText:SetText("")
-                        return
-                    end
+                    if not ns.DB.frame.showAuraTimers then selfIndicator.timerText:SetText(""); return end
                     local remain = data.expires - GetTime()
                     if remain <= 0 then
                         selfIndicator.timerText:SetText("")
                         selfIndicator:SetScript("OnUpdate", nil)
                     else
-                        if remain < 2.5 then
-                            selfIndicator.timerText:SetTextColor(1, 0.1, 0.1)
-                        elseif remain < 5 then
-                            selfIndicator.timerText:SetTextColor(1, 0.8, 0)
-                        else
-                            selfIndicator.timerText:SetTextColor(1, 1, 1)
-                        end
-                        
-                        if remain > 10 then
-                            selfIndicator.timerText:SetText(math.floor(remain))
-                        else
-                            selfIndicator.timerText:SetText(string.format("%.1f", remain))
-                        end
+                        if remain < 2.5 then selfIndicator.timerText:SetTextColor(1, 0.1, 0.1)
+                        elseif remain < 5 then selfIndicator.timerText:SetTextColor(1, 0.8, 0)
+                        else selfIndicator.timerText:SetTextColor(1, 1, 1) end
+                        if remain > 10 then selfIndicator.timerText:SetText(math.floor(remain))
+                        else selfIndicator.timerText:SetText(string.format("%.1f", remain)) end
                     end
                 end)
             else
-                ind.cd:Hide()
-                ind.timerText:SetText("")
-                ind:SetScript("OnUpdate", nil)
+                ind.cd:Hide(); ind.timerText:SetText(""); ind:SetScript("OnUpdate", nil)
             end
             ind:Show()
         else
-            ind:Hide()
-            ind:SetScript("OnUpdate", nil)
+            ind:Hide(); ind:SetScript("OnUpdate", nil)
         end
     end
 end
 
 function Auras:OnEvent(event, unit)
     if event == "UNIT_AURA" then
-        -- Optimization: only update buttons for this unit
         for _, b in ipairs(ns.Frames.buttons) do
             if b.unit == unit then self:UpdateButtonAuras(b) end
         end
