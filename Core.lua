@@ -101,7 +101,12 @@ frame:SetScript("OnEvent", function(self, event, arg1)
     end
 end)
 
-local events = { "PARTY_MEMBERS_CHANGED", "RAID_ROSTER_UPDATE", "UNIT_HEALTH", "UNIT_MAXHEALTH", "UNIT_AURA", "UNIT_POWER", "UNIT_DISPLAYPOWER" }
+-- Register secondary events
+local events = { 
+    "PARTY_MEMBERS_CHANGED", "RAID_ROSTER_UPDATE", 
+    "UNIT_HEALTH", "UNIT_MAXHEALTH", "UNIT_AURA", "UNIT_POWER", "UNIT_DISPLAYPOWER",
+    "LEARNED_SPELL_IN_TAB", "PLAYER_TALENT_UPDATE", "SKILL_LINES_CHANGED", "CHARACTER_POINTS_CHANGED", "SPELLS_CHANGED"
+}
 for _, ev in ipairs(events) do frame:RegisterEvent(ev) end
 
 if IsLoggedIn() then Bootstrap() end

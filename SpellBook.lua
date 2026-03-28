@@ -134,8 +134,10 @@ function SpellBook:Scan()
     self.stats.raw = 0
     self.stats.bindable = 0
     self.stats.healing = 0
-
+    
     local opts = ns.DB.scan
+    if not opts then return end
+    
     local tabCount = ns.Compat:GetNumSpellTabs()
     local seen = {}
     local stats = {
@@ -305,7 +307,9 @@ function SpellBook:OnEnable()
 end
 
 function SpellBook:OnEvent(event)
-    if event == "LEARNED_SPELL_IN_TAB" or event == "CHARACTER_POINTS_CHANGED" then
+    if event == "LEARNED_SPELL_IN_TAB" or event == "CHARACTER_POINTS_CHANGED" or 
+       event == "PLAYER_TALENT_UPDATE" or event == "SKILL_LINES_CHANGED" or
+       event == "SPELLS_CHANGED" then
         self:Scan()
     end
 end
