@@ -362,7 +362,7 @@ function Frames:CreateAnchor(id)
     return f
 end
 
-function Frames:EnsureAnchors()
+function Frames:EnsureAnchors(activeGroups)
     local dbf = ns.DB.frame
     if not self.container then self.container = self:CreateAnchor() end
     
@@ -379,7 +379,7 @@ function Frames:EnsureAnchors()
     self.container:Show()
 
     if dbf.splitGroups then
-        -- Hide visual parts of master container
+        -- Hide master container visuals
         self.container.bg:Hide()
         self.container.label:Hide()
         
@@ -387,39 +387,44 @@ function Frames:EnsureAnchors()
             if not self.anchors[i] then
                 self.anchors[i] = self:CreateAnchor(i)
             end
-            self.anchors[i]:Show()
-            self.anchors[i].bg:Show()
-            self.anchors[i].label:Show()
+            
+            local isNeeded = activeGroups and activeGroups[i]
+            local showAll = not ns.DB.locked
+            
+            if showAll or isNeeded then
+                self.anchors[i]:Show()
+                -- Visuals (label/bg) only show if unlocked OR if we explicitly want them while locked (user's request)
+                if showAll or isNeeded then
+                    self.anchors[i].bg:Show()
+                    self.anchors[i].label:Show()
+                else
+                    self.anchors[i].bg:Hide()
+                    self.anchors[i].label:Hide()
+                end
+            else
+                self.anchors[i]:Hide()
+            end
         end
     else
-        -- Show visual parts of master container
-        self.container.bg:Show()
-        self.container.label:Show()
+        -- Combined mode
+        local showMaster = not ns.DB.locked
+        self.container.bg:SetShown(showMaster)
+        self.container.label:SetShown(showMaster)
         
         for i = 1, 8 do
             if self.anchors[i] then self.anchors[i]:Hide() end
         end
     end
-    
-    -- If locked, hide all anchor visuals
-    if ns.DB.locked then
-        self.container.bg:Hide()
-        self.container.label:Hide()
-        for i = 1, 8 do
-            if self.anchors[i] then
-                self.anchors[i].bg:Hide()
-                self.anchors[i].label:Hide()
-            end
-        end
-    end
 end
 
 function Frames:ApplyLayout()
-    self:EnsureAnchors()
     local dbf = ns.DB.frame
     local isGrid = dbf.layoutStyle == "grid"
     local cfg = isGrid and dbf.grid or dbf.bars
     local tex = dbf.barTexture or STATUS_BAR_TEX
+    
+    -- We'll call EnsureAnchors from ApplyRoster now to know active groups
+    if not self.container then self.container = self:CreateAnchor() end
     
     local scale = cfg.scale or 1
     self.container:SetScale(scale)
@@ -478,6 +483,7 @@ function Frames:ApplyRoster()
     local cfg = isGrid and dbf.grid or dbf.bars
     local spacing = cfg.spacing or 4
     local countInGroup = {}
+    local activeGroups = {}
     
     local minX, maxX, minY, maxY = 0, 0, 0, 0
     local found = false
@@ -490,6 +496,9 @@ function Frames:ApplyRoster()
             b.fakeData = entry.fake and entry or nil
             b:ClearAllPoints()
             
+            local group = entry.group or 1
+            activeGroups[group] = true
+            
             local x, y
             if isGrid then
                 local cols = cfg.columns or 5
@@ -499,12 +508,11 @@ function Frames:ApplyRoster()
                 y = -8 - row * (cfg.size + spacing)
                 b:SetPoint("TOPLEFT", self.container, "TOPLEFT", x, y)
             elseif dbf.splitGroups then
-                local group = entry.group or 1
                 countInGroup[group] = (countInGroup[group] or 0) + 1
-                local anchor = self.anchors[group] or self.container
+                local anchor = self.anchors[group] or self:CreateAnchor(group)
+                self.anchors[group] = anchor
                 b:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, - (countInGroup[group] - 1) * (cfg.height + spacing))
             else
-                local group = entry.group or 1
                 countInGroup[group] = (countInGroup[group] or 0) + 1
                 local perRow = cfg.groupsPerRow or 2
                 local groupSpacing = cfg.groupSpacing or 18
@@ -545,6 +553,9 @@ function Frames:ApplyRoster()
     elseif not dbf.splitGroups then
         self.container:SetSize(200, 100)
     end
+    
+    -- Now ensure anchors are shown correctly based on active groups
+    self:EnsureAnchors(activeGroups)
 end
 
 local function ShortenName(name)
