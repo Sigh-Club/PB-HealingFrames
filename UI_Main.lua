@@ -113,9 +113,14 @@ function UI:CreateMainWindow()
     
     frame:Hide()
 
+    local headerIcon = frame:CreateTexture(nil, "OVERLAY")
+    headerIcon:SetSize(48, 48)
+    headerIcon:SetPoint("TOPLEFT", 10, -5)
+    headerIcon:SetTexture("Interface\\AddOns\\PB_HealingFrames\\Media\\MTCIcon.tga")
+
     local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetFont("Fonts\\FRIZQT__.TTF", 20, "OUTLINE")
-    title:SetPoint("TOP", 0, -15)
+    title:SetPoint("LEFT", headerIcon, "RIGHT", 15, 0)
     title:SetText("PB: Healing Frames V 1.3.3 beta")
 
     local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")

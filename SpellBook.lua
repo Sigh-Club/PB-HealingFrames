@@ -34,26 +34,28 @@ function SpellBook:FindByName(name)
     return self.byName[string.lower(name)]
 end
 
-local function guessRole(name, spellId)
-    local intel = ns.HealingIntel or {}
+-- Shared scan tooltip
+local scanTooltip
+local function getScanTooltip()
+    if not scanTooltip then
+        scanTooltip = CreateFrame("GameTooltip", "PB_ScanTooltip", nil, "GameTooltipTemplate")
+        scanTooltip:SetOwner(WorldFrame, "ANCHOR_NONE")
+    end
+    return scanTooltip
+end
+
+local function guessRole(slot, bookType)
+    local tooltip = getScanTooltip()
+    tooltip:ClearLines()
+    tooltip:SetSpell(slot, bookType)
+    
+    local name = GetSpellBookItemName(slot, bookType)
+    if not name then return nil, "none" end
     local lname = lower(name)
     
-    if spellId and intel.knownSpellRolesById and intel.knownSpellRolesById[spellId] then
-        return intel.knownSpellRolesById[spellId], "id"
-    end
+    local intel = ns.HealingIntel or {}
     local exact = intel.knownSpellRolesByName and intel.knownSpellRolesByName[lname]
     if exact then return exact, "name" end
-    
-    -- Heuristic Tooltip Check
-    local tooltip = ns.state.scanTooltip or CreateFrame("GameTooltip", "PB_ScanTooltip", nil, "GameTooltipTemplate")
-    ns.state.scanTooltip = tooltip
-    tooltip:SetOwner(WorldFrame, "ANCHOR_NONE")
-    tooltip:ClearLines()
-    if spellId then
-        tooltip:SetSpellByID(spellId)
-    else
-        tooltip:SetSpellName(name)
-    end
     
     local text = ""
     for i = 1, tooltip:NumLines() do
@@ -64,7 +66,6 @@ local function guessRole(name, spellId)
         end
     end
 
-    -- Role Identification based on Description
     if text:find("heals") or text:find("restores.*health") or text:find("points of health") or text:find("healing") then
         if text:find("over %d+ sec") or text:find("periodic") or text:find("each second") or text:find("every %d+ sec") then 
             return "hot", "heuristic" 
@@ -92,8 +93,6 @@ function SpellBook:Scan(force)
     
     local currentCount = 0
     local tabCount = ns.Compat:GetNumSpellTabs()
-    
-    -- If tabCount is 0, we might be too early, but let's try to continue if force is true
     if tabCount and tabCount > 0 then
         for tab = 1, tabCount do
             local _, _, _, numSpells = ns.Compat:GetSpellTabInfo(tab)
@@ -101,9 +100,7 @@ function SpellBook:Scan(force)
         end
     end
 
-    if not force and currentCount == lastSpellCount and lastSpellCount > 0 then
-        return
-    end
+    if not force and currentCount == lastSpellCount and lastSpellCount > 0 then return end
     
     lastScan = now
     lastSpellCount = currentCount
@@ -114,9 +111,8 @@ function SpellBook:Scan(force)
     
     local opts = ns.DB.scan or { excludeGeneral = true, excludePassive = true, excludeProfessions = true, dedupeByName = true }
     local seen = {}
+    local BOOKTYPE = "spell"
 
-    -- If tabCount is 0, we can't iterate tabs, but maybe we can iterate spellbook directly if needed?
-    -- No, 3.3.5a requires tab info for structured scan.
     if not tabCount or tabCount == 0 then return end
 
     for tab = 1, tabCount do
@@ -127,17 +123,14 @@ function SpellBook:Scan(force)
         for slot = offset + 1, offset + numSpells do
             local name, rank = ns.Compat:GetSpellName(slot)
             if name then
-                local link = ns.Compat:GetSpellLink(slot)
-                local spellId = ns.Compat:GetSpellIdFromLink(link)
                 local isPassive = ns.Compat:IsPassive(slot)
-                local guessedRole, _ = guessRole(name, spellId)
+                local guessedRole, _ = guessRole(slot, BOOKTYPE)
                 guessedRole = normalizeRole(guessedRole)
 
                 local entry = {
                     name = name,
                     rank = rank or "",
                     slot = slot,
-                    spellId = spellId,
                     texture = ns.Compat:GetSpellTexture(slot),
                     isPassive = isPassive,
                     isTrade = isTrade,
@@ -199,8 +192,6 @@ function SpellBook:Scan(force)
             self.stats.healing = self.stats.healing + 1
         end
     end
-
-    ns:Print(string.format("Scan complete: %d bindable spells found (%d healing)", self.stats.bindable, self.stats.healing))
 end
 
 function SpellBook:OnInitialize()
@@ -211,7 +202,5 @@ function SpellBook:OnEnable()
 end
 
 function SpellBook:OnEvent(event)
-    if event == "LEARNED_SPELL_IN_TAB" or event == "PLAYER_TALENT_UPDATE" then
-        self:Scan()
-    end
+    -- Silent scans and manual triggers only
 end
