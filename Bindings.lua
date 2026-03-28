@@ -55,58 +55,76 @@ local fallbackSmartBindPriorities = {
     },
 }
 
+local buttonPriority = {
+    LeftButton = 1,
+    RightButton = 2,
+    MiddleButton = 3,
+    MouseWheelUp = 4,
+    MouseWheelDown = 5,
+    Button4 = 6,
+    Button5 = 7,
+}
+
 function Bindings:GetOrderedSlots()
-    return orderedSlots
+    local slots = {}
+    for k in pairs(ns.DB.bindings) do
+        table.insert(slots, k)
+    end
+    table.sort(slots, function(a, b)
+        -- Extract modifiers and base button
+        local aParts = { strsplit("-", a) }
+        local bParts = { strsplit("-", b) }
+        local aBase = aParts[#aParts]
+        local bBase = bParts[#bParts]
+        local aNumMods = #aParts - 1
+        local bNumMods = #bParts - 1
+
+        -- 1. Sort by number of modifiers (none first)
+        if aNumMods ~= bNumMods then return aNumMods < bNumMods end
+        
+        -- 2. Sort by base button priority
+        local ap = buttonPriority[aBase] or 99
+        local bp = buttonPriority[bBase] or 99
+        if ap ~= bp then return ap < bp end
+        
+        -- 3. Alphabetical fallback
+        return a < b
+    end)
+    return slots
+end
+
+function Bindings:SetBinding(slot, btype, value)
+    ns.DB.bindings[slot] = { type = btype, value = value }
+    ns:Print((ns.L and ns.L.STATUS_BINDING_SET or "Binding updated") .. ": " .. slot .. " -> " .. (value ~= "" and value or btype))
+    if ns.ClickCast then ns.ClickCast:RefreshAll() end
+    if ns.UI_Main then ns.UI_Main:RefreshKeybinds() end
 end
 
 function Bindings:Get(slot)
-    ns.DB.bindings[slot] = ns.DB.bindings[slot] or { type = "spell", value = "" }
-    return ns.DB.bindings[slot]
+    return ns.DB.bindings[slot] or { type = "spell", value = "" }
 end
 
 function Bindings:SetSpell(slot, spellName)
-    local rec = self:Get(slot)
-    rec.type = "spell"
-    rec.value = spellName or ""
-    ns:Print((ns.L and ns.L.STATUS_BINDING_SET or "Binding updated") .. ": " .. slot .. " -> " .. rec.value)
-    if ns.ClickCast then ns.ClickCast:RefreshAll() end
-    if ns.UI_Bindings then ns.UI_Bindings:RefreshSlots() end
+    self:SetBinding(slot, "spell", spellName)
 end
 
 function Bindings:SetTarget(slot)
-    local rec = self:Get(slot)
-    rec.type = "target"
-    rec.value = ""
-    ns:Print((ns.L and ns.L.STATUS_BINDING_SET or "Binding updated") .. ": " .. slot .. " -> Target unit")
-    if ns.ClickCast then ns.ClickCast:RefreshAll() end
-    if ns.UI_Bindings then ns.UI_Bindings:RefreshSlots() end
+    self:SetBinding(slot, "target", "")
 end
 
 function Bindings:SetMenu(slot)
-    local rec = self:Get(slot)
-    rec.type = "menu"
-    rec.value = ""
-    ns:Print((ns.L and ns.L.STATUS_BINDING_SET or "Binding updated") .. ": " .. slot .. " -> Unit menu")
-    if ns.ClickCast then ns.ClickCast:RefreshAll() end
-    if ns.UI_Bindings then ns.UI_Bindings:RefreshSlots() end
+    self:SetBinding(slot, "menu", "")
 end
 
 function Bindings:SetMacro(slot, macroText)
-    local rec = self:Get(slot)
-    rec.type = "macro"
-    rec.value = macroText or ""
-    ns:Print((ns.L and ns.L.STATUS_BINDING_SET or "Binding updated") .. ": " .. slot .. " -> Smart Cleanse Macro")
-    if ns.ClickCast then ns.ClickCast:RefreshAll() end
-    if ns.UI_Bindings then ns.UI_Bindings:RefreshSlots() end
+    self:SetBinding(slot, "macro", macroText)
 end
 
 function Bindings:Clear(slot)
-    local rec = self:Get(slot)
-    rec.type = "spell"
-    rec.value = ""
+    ns.DB.bindings[slot] = nil
     ns:Print((ns.L and ns.L.STATUS_BINDING_CLEARED or "Binding cleared") .. ": " .. slot)
     if ns.ClickCast then ns.ClickCast:RefreshAll() end
-    if ns.UI_Bindings then ns.UI_Bindings:RefreshSlots() end
+    if ns.UI_Main then ns.UI_Main:RefreshKeybinds() end
 end
 
 local function isEmpty(rec)

@@ -615,28 +615,102 @@ local function CreateSpellPicker()
     return f
 end
 
+local bindCaptureFrame
+
+local function CreateBindCapture()
+    if bindCaptureFrame then return bindCaptureFrame end
+    
+    local f = CreateFrame("Frame", "PB_BindCapture", UIParent)
+    f:SetSize(300, 150)
+    f:SetPoint("CENTER")
+    f:SetFrameStrata("DIALOG")
+    f:Hide()
+    CreateFrameBackdrop(f)
+    f:SetBackdropColor(0.1, 0.1, 0.1, 0.95)
+    
+    local txt = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    txt:SetPoint("CENTER", 0, 10)
+    txt:SetText("Press Mouse Button + Modifiers\n(Shift, Ctrl, Alt)")
+    f.txt = txt
+    
+    local cancel = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+    cancel:SetSize(80, 22); cancel:SetPoint("BOTTOM", 0, 15); cancel:SetText("Cancel")
+    cancel:SetScript("OnClick", function() f:Hide() end)
+    
+    f:EnableMouse(true)
+    f:SetScript("OnMouseDown", function(self, button)
+        local mods = {}
+        if IsShiftKeyDown() then table.insert(mods, "Shift") end
+        if IsControlKeyDown() then table.insert(mods, "Ctrl") end
+        if IsAltKeyDown() then table.insert(mods, "Alt") end
+        
+        local slot = ""
+        if #mods > 0 then
+            slot = table.concat(mods, "-") .. "-" .. button
+        else
+            slot = button
+        end
+        
+        self:Hide()
+        if self.callback then self.callback(slot) end
+    end)
+
+    f:EnableMouseWheel(true)
+    f:SetScript("OnMouseWheel", function(self, delta)
+        local mods = {}
+        if IsShiftKeyDown() then table.insert(mods, "Shift") end
+        if IsControlKeyDown() then table.insert(mods, "Ctrl") end
+        if IsAltKeyDown() then table.insert(mods, "Alt") end
+        
+        local button = (delta > 0) and "MouseWheelUp" or "MouseWheelDown"
+        local slot = ""
+        if #mods > 0 then
+            slot = table.concat(mods, "-") .. "-" .. button
+        else
+            slot = button
+        end
+        
+        self:Hide()
+        if self.callback then self.callback(slot) end
+    end)
+    
+    bindCaptureFrame = f
+    return f
+end
+
 function UI:LoadKeybinds(c)
     if c.loaded then self:RefreshKeybinds(); return end
     local y = 0
     
     local title = c:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOPLEFT", 15, y); title:SetText("Keybinds")
-    y = y - 40
+    y = y - 45
 
     local tip = c:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     tip:SetPoint("TOPLEFT", 15, y); tip:SetText("Click + to assign a spell, X to clear, or use Auto Bind")
-    tip:SetTextColor(0.7, 0.7, 0.7); y = y - 35
+    tip:SetTextColor(0.7, 0.7, 0.7); y = y - 40
 
     local smart = CreateFrame("Button", nil, c, "UIPanelButtonTemplate")
-    smart:SetSize(140, 26); smart:SetPoint("TOPLEFT", 15, y); smart:SetText("Auto Bind")
+    smart:SetSize(160, 28); smart:SetPoint("TOPLEFT", 15, y); smart:SetText("Auto Bind")
     smart:SetScript("OnClick", function() ns.Bindings:SmartBind(); self:RefreshKeybinds() end)
 
+    local addBind = CreateFrame("Button", nil, c, "UIPanelButtonTemplate")
+    addBind:SetSize(160, 28); addBind:SetPoint("LEFT", smart, "RIGHT", 10, 0); addBind:SetText("Add Binding")
+    addBind:SetScript("OnClick", function()
+        local capture = CreateBindCapture()
+        capture.callback = function(slot)
+            if not spellPickerFrame then CreateSpellPicker() end
+            spellPickerFrame:Open(slot, addBind) -- Open picker for this new slot
+        end
+        capture:Show()
+    end)
+
     local clearAll = CreateFrame("Button", nil, c, "UIPanelButtonTemplate")
-    clearAll:SetSize(120, 26); clearAll:SetPoint("LEFT", smart, "RIGHT", 10, 0); clearAll:SetText("Clear All")
+    clearAll:SetSize(140, 28); clearAll:SetPoint("LEFT", addBind, "RIGHT", 10, 0); clearAll:SetText("Clear All")
     clearAll:SetScript("OnClick", function() 
         for _, slot in ipairs(ns.Bindings:GetOrderedSlots()) do ns.Bindings:Clear(slot) end
         self:RefreshKeybinds() 
-    end); y = y - 45
+    end); y = y - 55
 
     c.keyHeader = c:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     c.keyHeader:SetPoint("TOPLEFT", 15, y); c.keyHeader:SetText("--- Bindings ---")
@@ -655,40 +729,52 @@ function UI:RefreshKeybinds()
     if not spellPickerFrame then CreateSpellPicker() end
     
     local slots = ns.Bindings:GetOrderedSlots()
+    if not content.keyRows then content.keyRows = {} end
+
+    -- Hide all existing rows first
+    for _, row in ipairs(content.keyRows) do row:Hide() end
+
     for i, slot in ipairs(slots) do
-        local row = content.keyRows and content.keyRows[i]
+        local row = content.keyRows[i]
         if not row then
             row = CreateFrame("Frame", nil, content)
-            row:SetSize(500, 28)
-            row:SetPoint("TOPLEFT", 15, y - (i-1) * 30)
+            row:SetSize(550, 32)
+            row:SetPoint("TOPLEFT", 15, y - (i-1) * 34)
             
             row.txt = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
             row.txt:SetPoint("LEFT", 5, 0)
-            row.txt:SetText(slot)
             
             row.spell = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-            row.spell:SetPoint("LEFT", 140, 0)
-            row.spell:SetWidth(300)
+            row.spell:SetPoint("LEFT", 160, 0)
+            row.spell:SetWidth(350)
             
             local plus = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-            plus:SetSize(28, 22); plus:SetPoint("RIGHT", -5, 0); plus:SetText("+")
-            plus:SetScript("OnClick", function()
-                spellPickerFrame:Open(slot, row)
-            end)
+            plus:SetSize(32, 24); plus:SetPoint("RIGHT", -5, 0); plus:SetText("+")
             row.plus = plus
             
             local clr = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-            clr:SetSize(28, 22); clr:SetPoint("RIGHT", plus, "LEFT", -4, 0); clr:SetText("X")
-            clr:SetScript("OnClick", function() ns.Bindings:Clear(slot); self:RefreshKeybinds() end)
+            clr:SetSize(32, 24); clr:SetPoint("RIGHT", plus, "LEFT", -5, 0); clr:SetText("X")
             row.clr = clr
             
-            if not content.keyRows then content.keyRows = {} end
             content.keyRows[i] = row
         end
+        
+        row.txt:SetText(slot)
         local rec = ns.Bindings:Get(slot)
         local text = rec.value or ""
-        if text == "" then text = "|cff888888-- none --|r" end
+        if text == "" then text = "|cff888888-- " .. rec.type .. " --|r" end
         row.spell:SetText(text)
+        
+        row.plus:SetScript("OnClick", function()
+            spellPickerFrame:Open(slot, row)
+        end)
+        
+        row.clr:SetScript("OnClick", function()
+            ns.Bindings:Clear(slot)
+            self:RefreshKeybinds()
+        end)
+
+        row:Show()
     end
 end
 

@@ -7,21 +7,27 @@ local buttonMap = {
     LeftButton = "1",
     RightButton = "2",
     MiddleButton = "3",
-    MouseWheelUp = "6",
-    MouseWheelDown = "7",
     Button4 = "4",
     Button5 = "5",
 }
 
 local function parseSlot(slot)
-    local button = slot
-    local prefix = nil
-    local dash = string.find(slot, "-", 1, true)
-    if dash then
-        prefix = string.lower(string.sub(slot, 1, dash - 1))
-        button = string.sub(slot, dash + 1)
+    -- slot can be "Shift-Ctrl-LeftButton"
+    local parts = { strsplit("-", slot) }
+    local button = parts[#parts]
+    local buttonIndex = buttonMap[button]
+    if not buttonIndex then return nil end
+
+    local modifiers = {}
+    for i = 1, #parts - 1 do
+        table.insert(modifiers, string.lower(parts[i]))
     end
-    return prefix, buttonMap[button]
+    table.sort(modifiers) -- Ensure consistent order: alt, ctrl, shift
+    
+    local prefix = table.concat(modifiers, "-")
+    if prefix == "" then prefix = nil end
+    
+    return prefix, buttonIndex
 end
 
 local function clearBinding(btn, slot)
