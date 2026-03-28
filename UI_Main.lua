@@ -299,6 +299,27 @@ function UI:LoadLayout(c)
     c.bGroupSp = mkSlider(c, "Group Gap", 5, 100, 1, function() return ns.DB.frame.bars.groupSpacing or 18 end, function(v) ns.DB.frame.bars.groupSpacing = v end)
     c.bGroupSp:SetPoint("TOPLEFT", 280, y); c.bGroupSp:SetWidth(180); y = y - 65
 
+    local function updateBarUnitsVisibility()
+        if not c.bUnits then return end
+        local show = (ns.DB.frame.bars.horizontalFill ~= false)
+        c.bUnits:SetShown(show)
+    end
+
+    c.bHorizontal = mkCheck(c, "Horizontal Fill (Bars)", "Fill each group left-to-right before moving down.",
+        function() return ns.DB.frame.bars.horizontalFill ~= false end,
+        function(v)
+            ns.DB.frame.bars.horizontalFill = v
+            updateBarUnitsVisibility()
+            if ns.Frames then ns.Frames:ApplyLayout() end
+        end)
+    c.bHorizontal:SetPoint("TOPLEFT", 15, y)
+
+    c.bUnits = mkSlider(c, "Units/Row", 1, 10, 1,
+        function() return ns.DB.frame.bars.unitsPerRow or 1 end,
+        function(v) ns.DB.frame.bars.unitsPerRow = v end)
+    c.bUnits:SetPoint("TOPLEFT", 280, y - 5); c.bUnits:SetWidth(180); y = y - 70
+    updateBarUnitsVisibility()
+
     local gridHeader = c:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     gridHeader:SetPoint("TOPLEFT", 15, y); gridHeader:SetText("--- Grid Mode Settings ---")
     c.gridHeader = gridHeader
@@ -309,11 +330,19 @@ function UI:LoadLayout(c)
     c.gSize = mkSlider(c, "Size", 20, 200, 1, function() return ns.DB.frame.grid.size or 40 end, function(v) ns.DB.frame.grid.size = v end)
     c.gSize:SetPoint("TOPLEFT", 280, y - 40); c.gSize:SetWidth(180); y = y - 85
 
-    c.gCols = mkSlider(c, "Columns", 1, 20, 1, function() return ns.DB.frame.grid.columns or 5 end, function(v) ns.DB.frame.grid.columns = v end)
+    c.gCols = mkSlider(c, "Units/Line", 1, 20, 1, function() return ns.DB.frame.grid.columns or 5 end, function(v) ns.DB.frame.grid.columns = v end)
     c.gCols:SetPoint("TOPLEFT", 15, y); c.gCols:SetWidth(180)
 
     c.gSpacing = mkSlider(c, "Spacing", 0, 40, 1, function() return ns.DB.frame.grid.spacing or 2 end, function(v) ns.DB.frame.grid.spacing = v end)
-    c.gSpacing:SetPoint("TOPLEFT", 280, y); c.gSpacing:SetWidth(180)
+    c.gSpacing:SetPoint("TOPLEFT", 280, y); c.gSpacing:SetWidth(180); y = y - 65
+
+    c.gHorizontal = mkCheck(c, "Horizontal Fill (Grid)", "Fill grid rows left-to-right before moving down.",
+        function() return ns.DB.frame.grid.horizontalFill ~= false end,
+        function(v)
+            ns.DB.frame.grid.horizontalFill = v
+            if ns.Frames then ns.Frames:ApplyLayout() end
+        end)
+    c.gHorizontal:SetPoint("TOPLEFT", 15, y); y = y - 40
 
     mode:HookScript("OnClick", function() self:UpdateLayoutVisibility(c) end)
     self:UpdateLayoutVisibility(c)
@@ -326,8 +355,14 @@ function UI:UpdateLayoutVisibility(c)
     c.barHeader:SetShown(not isGrid)
     c.bScale:SetShown(not isGrid); c.bWidth:SetShown(not isGrid); c.bHeight:SetShown(not isGrid)
     c.bSpacing:SetShown(not isGrid); c.bCols:SetShown(not isGrid); c.bGroupSp:SetShown(not isGrid)
+    if c.bHorizontal then c.bHorizontal:SetShown(not isGrid) end
+    if c.bUnits then
+        local showUnits = (not isGrid) and (ns.DB.frame.bars.horizontalFill ~= false)
+        c.bUnits:SetShown(showUnits)
+    end
     c.gridHeader:SetShown(isGrid)
     c.gScale:SetShown(isGrid); c.gSize:SetShown(isGrid); c.gCols:SetShown(isGrid); c.gSpacing:SetShown(isGrid)
+    if c.gHorizontal then c.gHorizontal:SetShown(isGrid) end
 end
 
 function UI:LoadStyle(c)
@@ -383,6 +418,13 @@ function UI:LoadStyle(c)
     mkCheck(c, "Target Glow", "Show white border on current target.", 
         function() return ns.DB.frame.showTargetGlow ~= false end, function(v) ns.DB.frame.showTargetGlow = v end):SetPoint("TOPLEFT", 15, y); y = y - 32
 
+    mkCheck(c, "Raid Icons", "Display raid target markers on frames.",
+        function() return ns.DB.frame.showRaidIcons ~= false end,
+        function(v)
+            ns.DB.frame.showRaidIcons = v
+            if ns.Frames then ns.Frames:ApplyLayout() end
+        end):SetPoint("TOPLEFT", 15, y); y = y - 32
+
     mkCheck(c, "Show Deficit", "Show -HP instead of % when injured.", 
         function() return ns.DB.frame.showDeficit ~= false end, function(v) ns.DB.frame.showDeficit = v end):SetPoint("TOPLEFT", 15, y); y = y - 32
 
@@ -415,6 +457,17 @@ function UI:LoadStyle(c)
 
     mkCheck(c, "Aura Timers", "Show cooldown timers on auras.", 
         function() return ns.DB.frame.showAuraTimers ~= false end, function(v) ns.DB.frame.showAuraTimers = v end):SetPoint("TOPLEFT", 15, y); y = y - 45
+
+    local raidSizeSlider = mkSlider(c, "Raid Icon Size", 8, 32, 1,
+        function() return ns.DB.frame.raidIconSize or 16 end,
+        function(v)
+            ns.DB.frame.raidIconSize = v
+            if ns.Frames then ns.Frames:ApplyLayout() end
+        end)
+    raidSizeSlider:SetPoint("TOPLEFT", 280, y + 15)
+    raidSizeSlider:SetWidth(180)
+
+    y = y - 65
 
     local th3 = c:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     th3:SetPoint("TOPLEFT", 15, y); th3:SetText("--- Name Options ---"); y = y - 35

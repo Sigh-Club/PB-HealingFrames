@@ -5,8 +5,17 @@ ns.Frames = Frames
 Frames.container = nil
 Frames.anchors = {}
 Frames.buttons = {}
+Frames.unitButtons = {}
+Frames.guidButtons = {}
 Frames.MAX = 40
 Frames.queue = {}
+Frames.fakeUpdateInterval = 0.05
+Frames.fakeDriver = CreateFrame("Frame")
+Frames.fakeDriver:Hide()
+Frames.fakeDriver.accum = 0
+Frames.fakeDriver:SetScript("OnUpdate", function(_, elapsed)
+    Frames:OnFakeUpdate(elapsed)
+end)
 
 local classColors = RAID_CLASS_COLORS or {}
 local STATUS_BAR_TEX = "Interface\\TargetingFrame\\UI-StatusBar"
@@ -81,8 +90,26 @@ local function CreateAuraIndicator(parent, point, x, y)
     local f = CreateFrame("Frame", nil, parent)
     f:SetSize(14, 14)
     f:SetPoint(point, parent, point, x, y)
+    f:SetFrameLevel(parent:GetFrameLevel() + 10)
     f:EnableMouse(false)
-    
+
+    local glow = f:CreateTexture(nil, "OVERLAY")
+    glow:SetPoint("TOPLEFT", -3, 3)
+    glow:SetPoint("BOTTOMRIGHT", 3, -3)
+    glow:SetTexture("Interface\\Cooldown\\star4")
+    glow:SetVertexColor(0.8, 1, 1, 0.6)
+    glow:SetBlendMode("ADD")
+    f.glow = glow
+
+    local anim = glow:CreateAnimationGroup()
+    local spin = anim:CreateAnimation("Rotation")
+    spin:SetDuration(2.2)
+    spin:SetDegrees(360)
+    spin:SetOrder(1)
+    anim:SetLooping("REPEAT")
+    anim:Play()
+    f.glowAnim = anim
+
     local icon = f:CreateTexture(nil, "ARTWORK")
     icon:SetAllPoints()
     icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
@@ -109,10 +136,92 @@ local function CreateAuraIndicator(parent, point, x, y)
     return f
 end
 
+local HOT_ORDER_BARS = {"topleft", "bottomleft", "topright", "bottomright"}
+local HOT_ORDER_GRID = {"topleft", "topright"}
+
+local function LayoutAuraIndicators(button, isGrid, cfg)
+    if not button or not button.auraIndicators then return end
+    local order = isGrid and HOT_ORDER_GRID or HOT_ORDER_BARS
+    button.hotIndicatorOrder = order
+    button.hotIndicatorLimit = #order
+
+    local barHeight = isGrid and (cfg.size or 40) or (cfg.height or 22)
+    local iconSize = math.max(math.min(barHeight - 6, 18), 10)
+    local spacing = 2
+    local centerY = isGrid and 0 or 1
+    local edgePadding = 4
+    local half = iconSize / 2
+
+    local leftSlots = math.min(2, math.ceil(#order / 2))
+    local rightSlots = #order - leftSlots
+
+    for idx, slot in ipairs(order) do
+        local ind = button.auraIndicators[slot]
+        if ind then
+            ind:SetSize(iconSize, iconSize)
+            ind:ClearAllPoints()
+            ind._disabled = false
+            if isGrid then
+                local total = #order
+                local spread = iconSize + spacing
+                local start = -((total - 1) * spread) / 2
+                local offset = start + (idx - 1) * spread
+                ind:SetPoint("BOTTOM", button, "BOTTOM", offset, edgePadding)
+            elseif idx <= leftSlots then
+                local offset = edgePadding + half + (idx - 1) * (iconSize + spacing)
+                ind:SetPoint("CENTER", button, "LEFT", offset, centerY)
+            else
+                local rightIndex = idx - leftSlots
+                local offset = edgePadding + half + (rightIndex - 1) * (iconSize + spacing)
+                ind:SetPoint("CENTER", button, "RIGHT", -offset, centerY)
+            end
+        end
+    end
+
+    -- Disable unused indicators for current layout
+    local allSlots = {"topleft", "topright", "bottomleft", "bottomright"}
+    for _, slot in ipairs(allSlots) do
+        local used = false
+        for _, activeSlot in ipairs(order) do if activeSlot == slot then used = true break end end
+        if not used then
+            local ind = button.auraIndicators[slot]
+            if ind then
+                ind:Hide()
+                ind:SetScript("OnUpdate", nil)
+                ind._disabled = true
+            end
+        end
+    end
+
+    local center = button.auraIndicators.center
+    if center then
+        center:ClearAllPoints()
+        center:SetPoint("CENTER", button, "CENTER", 0, 0)
+        center:SetSize(iconSize + 4, iconSize + 4)
+    end
+end
+
+local function registerButtonUnit(btn, unit)
+    if not btn then return end
+    if btn.unit == unit then return end
+    if btn.unit then
+        Frames.unitButtons[btn.unit] = nil
+        local prevGuid = UnitGUID(btn.unit)
+        if prevGuid then Frames.guidButtons[prevGuid] = nil end
+    end
+    btn.unit = unit
+    if unit then
+        Frames.unitButtons[unit] = btn
+        local guid = UnitGUID(unit)
+        if guid then Frames.guidButtons[guid] = btn end
+    end
+end
+
 local function processQueue()
     if InCombatLockdown() then return end
     for btn, unit in pairs(Frames.queue) do
-        btn:SetAttribute("unit", unit)
+        ns:SafeSetAttribute(btn, "unit", unit)
+        registerButtonUnit(btn, unit)
         Frames.queue[btn] = nil
     end
 end
@@ -121,7 +230,8 @@ local function setUnit(btn, unit)
     if InCombatLockdown() then
         Frames.queue[btn] = unit
     else
-        btn:SetAttribute("unit", unit)
+        ns:SafeSetAttribute(btn, "unit", unit)
+        registerButtonUnit(btn, unit)
         Frames.queue[btn] = nil
     end
 end
@@ -311,13 +421,22 @@ local function CreateButton(i)
     name:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
     name:SetShadowOffset(1, -1)
     name:SetTextColor(1, 1, 1)
+    name:SetWordWrap(false)
+    name:SetNonSpaceWrap(false)
     b.nameText = name
 
     local roleIcon = inter:CreateTexture(nil, "OVERLAY")
     roleIcon:SetSize(12, 12)
-    roleIcon:SetPoint("TOPLEFT", 2, -2)
+    roleIcon:SetPoint("TOPLEFT", 2, -16)
     roleIcon:Hide()
     b.roleIcon = roleIcon
+
+    local raidIcon = inter:CreateTexture(nil, "OVERLAY")
+    raidIcon:SetSize(16, 16)
+    raidIcon:SetPoint("TOPLEFT", b, "TOPLEFT", -6, 6)
+    raidIcon:SetTexture("Interface\\TARGETINGFRAME\\UI-RaidTargetingIcons")
+    raidIcon:Hide()
+    b.raidIcon = raidIcon
 
     local mana = CreateFrame("StatusBar", nil, b)
     mana:SetStatusBarTexture(STATUS_BAR_TEX)
@@ -325,15 +444,17 @@ local function CreateButton(i)
     b.mana = mana
 
     b.auraIndicators = {
-        topleft = CreateAuraIndicator(inter, "TOPLEFT", 2, -2),
-        topright = CreateAuraIndicator(inter, "TOPRIGHT", -2, -2),
-        bottomleft = CreateAuraIndicator(inter, "BOTTOMLEFT", 2, 2),
-        bottomright = CreateAuraIndicator(inter, "BOTTOMRIGHT", -2, 2),
+        topleft = CreateAuraIndicator(inter, "CENTER", 0, 0),
+        topright = CreateAuraIndicator(inter, "CENTER", 0, 0),
+        bottomleft = CreateAuraIndicator(inter, "CENTER", 0, 0),
+        bottomright = CreateAuraIndicator(inter, "CENTER", 0, 0),
         center = CreateAuraIndicator(inter, "CENTER", 0, 0),
     }
     b.auraIndicators.center:SetSize(20, 20)
     b.auraIndicators.center.icon:SetTexCoord(0, 1, 0, 1) -- Fuller icon for center
     b.auraIndicators.center:SetFrameLevel(inter:GetFrameLevel() + 5)
+
+    LayoutAuraIndicators(b, false, ns.DB and ns.DB.frame and ns.DB.frame.bars or {})
 
     return b
 end
@@ -475,7 +596,7 @@ function Frames:ApplyLayout()
         if isGrid then
             b:SetSize(cfg.size or 40, cfg.size or 40)
             b.nameText:ClearAllPoints()
-            b.nameText:SetPoint("CENTER", 0, 0)
+            b.nameText:SetPoint("TOP", 0, -2)
             b.nameText:SetJustifyH("CENTER")
             b.statusText:Hide()
             b.border:Hide()
@@ -483,12 +604,36 @@ function Frames:ApplyLayout()
         else
             b:SetSize(cfg.width or 180, cfg.height or 22)
             b.nameText:ClearAllPoints()
-            b.nameText:SetPoint("LEFT", 6, 0)
-            b.nameText:SetJustifyH("LEFT")
+            b.nameText:SetPoint("TOP", 0, -2)
+            b.nameText:SetJustifyH("CENTER")
             b.statusText:Show()
             b.border:Show()
             b.shine:Show()
         end
+
+        local nameWidth
+        if isGrid then
+            nameWidth = math.max((cfg.size or 40) - 8, 16)
+            b.nameText.maxChars = 4
+        else
+            nameWidth = math.max((cfg.width or 180) - 70, 40)
+            b.nameText.maxChars = nil
+        end
+        b.nameText:SetWidth(nameWidth)
+        b.statusText:ClearAllPoints()
+        if isGrid then
+            b.statusText:SetPoint("BOTTOM", 0, 2)
+        else
+            b.statusText:SetPoint("CENTER", 0, -8)
+        end
+
+        LayoutAuraIndicators(b, isGrid, cfg)
+
+        local raidSize = dbf.raidIconSize or 16
+        local raidOffset = math.floor(raidSize * 0.4)
+        b.raidIcon:ClearAllPoints()
+        b.raidIcon:SetSize(raidSize, raidSize)
+        b.raidIcon:SetPoint("TOPLEFT", b, "TOPLEFT", -raidOffset, raidOffset)
 
         local nfs = dbf.nameFontSize or 10
         local sfs = dbf.statusFontSize or 8
@@ -509,6 +654,30 @@ function Frames:ApplyLayout()
     self:ApplyRoster()
 end
 
+function Frames:SetFakeUpdatesEnabled(flag)
+    if not self.fakeDriver then return end
+    self.fakeEnabled = flag and true or false
+    self.fakeDriver.accum = 0
+    if flag then
+        self.fakeDriver:Show()
+    else
+        self.fakeDriver:Hide()
+    end
+end
+
+function Frames:OnFakeUpdate(elapsed)
+    if not self.fakeEnabled or not self.fakeDriver then return end
+    local interval = self.fakeUpdateInterval or 0.05
+    self.fakeDriver.accum = (self.fakeDriver.accum or 0) + elapsed
+    if self.fakeDriver.accum < interval then return end
+    self.fakeDriver.accum = 0
+    for _, b in ipairs(self.buttons) do
+        if b.fakeData and b:IsShown() then
+            self:UpdateButton(b)
+        end
+    end
+end
+
 function Frames:ApplyRoster()
     local entries = ns.Roster.entries or {}
     local dbf = ns.DB.frame
@@ -517,7 +686,9 @@ function Frames:ApplyRoster()
     local spacing = cfg.spacing or 4
     local countInGroup = {}
     local activeGroups = {}
-    
+
+    if ns.Auras and ns.Auras.WipeCache then ns.Auras:WipeCache() end
+
     local minX, maxX, minY, maxY = 0, 0, 0, 0
     local found = false
 
@@ -525,8 +696,13 @@ function Frames:ApplyRoster()
         local b = self.buttons[i]
         local entry = entries[i]
         if entry then
-            b.unit = entry.unit
-            b.fakeData = entry.fake and entry or nil
+            if entry.fake then
+                b.fakeData = entry
+                setUnit(b, nil)
+            else
+                b.fakeData = nil
+                setUnit(b, entry.unit)
+            end
             b:ClearAllPoints()
             
             local group = entry.group or 1
@@ -534,11 +710,20 @@ function Frames:ApplyRoster()
             
             local x, y
             if isGrid then
-                local cols = cfg.columns or 5
-                local col = (i - 1) % cols
-                local row = math.floor((i - 1) / cols)
-                x = 8 + col * (cfg.size + spacing)
-                y = -8 - row * (cfg.size + spacing)
+                local unitsPerLine = math.max(1, math.floor(cfg.columns or 5))
+                local horizontalFill = cfg.horizontalFill ~= false
+                local index = i - 1
+                local col, row
+                if horizontalFill then
+                    col = index % unitsPerLine
+                    row = math.floor(index / unitsPerLine)
+                else
+                    row = index % unitsPerLine
+                    col = math.floor(index / unitsPerLine)
+                end
+                local size = cfg.size or 40
+                x = 8 + col * (size + spacing)
+                y = -8 - row * (size + spacing)
                 b:SetPoint("TOPLEFT", self.container, "TOPLEFT", x, y)
             elseif dbf.splitGroups then
                 countInGroup[group] = (countInGroup[group] or 0) + 1
@@ -551,9 +736,28 @@ function Frames:ApplyRoster()
                 local groupSpacing = cfg.groupSpacing or 18
                 local gCol = (group - 1) % perRow
                 local gRow = math.floor((group - 1) / perRow)
-                x = 8 + gCol * (cfg.width + groupSpacing)
-                y = -8 - gRow * ((cfg.height + spacing) * 5 + groupSpacing) - (countInGroup[group] - 1) * (cfg.height + spacing)
-                b:SetPoint("TOPLEFT", self.container, "TOPLEFT", x, y)
+                local unitIndex = countInGroup[group] - 1
+
+                if cfg.horizontalFill ~= false then
+                    local unitsPerRow = math.max(1, math.floor(cfg.unitsPerRow or 1))
+                    local unitWidth = (cfg.width or 180) + spacing
+                    local unitHeight = (cfg.height or 22) + spacing
+                    local maxGroupSize = cfg.maxGroupSize or 5
+                    local groupRows = math.ceil(maxGroupSize / unitsPerRow)
+                    local groupWidth = unitsPerRow * unitWidth
+                    local groupHeight = groupRows * unitHeight
+                    local colInGroup = unitIndex % unitsPerRow
+                    local rowInGroup = math.floor(unitIndex / unitsPerRow)
+                    local groupBaseX = 8 + gCol * (groupWidth + groupSpacing)
+                    local groupBaseY = -8 - gRow * (groupHeight + groupSpacing)
+                    x = groupBaseX + colInGroup * unitWidth
+                    y = groupBaseY - rowInGroup * unitHeight
+                    b:SetPoint("TOPLEFT", self.container, "TOPLEFT", x, y)
+                else
+                    x = 8 + gCol * ((cfg.width or 180) + groupSpacing)
+                    y = -8 - gRow * (((cfg.height or 22) + spacing) * 5 + groupSpacing) - unitIndex * ((cfg.height or 22) + spacing)
+                    b:SetPoint("TOPLEFT", self.container, "TOPLEFT", x, y)
+                end
             end
             
             -- Track bounds for master container (non-split mode)
@@ -570,13 +774,11 @@ function Frames:ApplyRoster()
                 end
             end
 
-            ns:SafeSetAttribute(b, "unit", entry.unit)
             b:Show()
             self:UpdateButton(b)
         else
             b:Hide()
-            b.unit = nil
-            ns:SafeSetAttribute(b, "unit", nil)
+            setUnit(b, nil)
         end
     end
 
@@ -595,8 +797,14 @@ local function ShortenName(name)
     local dbf = ns.DB.frame
     local isGrid = dbf.layoutStyle == "grid"
     local cfg = isGrid and dbf.grid or dbf.bars
-    if not cfg.shortenNames then return name end
-    local len = tonumber(cfg.nameLength) or (isGrid and 6 or 12)
+    local maxChars = nil
+    if isGrid then
+        maxChars = 4
+    elseif cfg.shortenNames then
+        maxChars = tonumber(cfg.nameLength) or 12
+    end
+    if not maxChars then return name end
+    local len = maxChars
     if not name or string.len(name) <= len then return name end
     
     if len <= 4 then
@@ -719,6 +927,36 @@ function Frames:UpdateButton(b)
         b.focusGlow:Hide()
     end
 
+    local showRaidIcons = dbf.showRaidIcons ~= false
+    if showRaidIcons and not fake then
+        local iconIndex = unit and GetRaidTargetIndex(unit)
+        if not iconIndex then
+            local guid
+            if unit and UnitExists(unit) then
+                guid = UnitGUID(unit)
+            end
+            if not iconIndex and guid and ns.Roster and ns.Roster.fakeIcons then
+                iconIndex = ns.Roster.fakeIcons[guid]
+            end
+        end
+        if iconIndex then
+            SetRaidTargetIconTexture(b.raidIcon, iconIndex)
+            b.raidIcon:Show()
+        else
+            b.raidIcon:Hide()
+        end
+    elseif showRaidIcons then
+        local iconIndex = b.fakeData and b.fakeData.raidIcon
+        if iconIndex then
+            SetRaidTargetIconTexture(b.raidIcon, iconIndex)
+            b.raidIcon:Show()
+        else
+            b.raidIcon:Hide()
+        end
+    else
+        b.raidIcon:Hide()
+    end
+
     local stText = status
     if not stText then
         if hp < maxhp and dbf.showDeficit ~= false then
@@ -750,6 +988,25 @@ function Frames:UpdateButton(b)
     if ns.ClickCast then ns.ClickCast:ApplyBindings(b) end
 end
 
+function Frames:GetButtonForUnit(unit)
+    if not unit then return nil end
+    local btn = self.unitButtons[unit]
+    if btn then return btn end
+    local guid = UnitGUID(unit)
+    if guid and self.guidButtons[guid] then
+        local found = self.guidButtons[guid]
+        self.unitButtons[unit] = found
+        return found
+    end
+    for storedUnit, storedBtn in pairs(self.unitButtons) do
+        if storedBtn and UnitIsUnit(unit, storedUnit) then
+            self.unitButtons[unit] = storedBtn
+            return storedBtn
+        end
+    end
+    return nil
+end
+
 function Frames:UpdateRange(b)
     if not b.unit or b.fakeData then b:SetAlpha(1) return end
     local inRange = IsUnitInHealRange(b.unit)
@@ -779,7 +1036,10 @@ function Frames:ResetAnchorPositions()
 end
 
 function Frames:OnInitialize() self:EnsureAnchors() end
-function Frames:OnEnable() self:ApplyLayout() end
+function Frames:OnEnable()
+    self:ApplyLayout()
+    self:SetFakeUpdatesEnabled(ns.DB.frame.fakeMode)
+end
 function Frames:OnEvent(event, unit) 
     if event == "PLAYER_ENTERING_WORLD" or event == "PARTY_MEMBERS_CHANGED" or event == "RAID_ROSTER_UPDATE" then
         self:ApplyLayout() 
@@ -788,6 +1048,10 @@ function Frames:OnEvent(event, unit)
     elseif event == "PLAYER_TARGET_CHANGED" or event == "PLAYER_FOCUS_CHANGED" then
         for _, b in ipairs(self.buttons) do 
             if b:IsShown() and b.unit then self:UpdateButton(b) end 
+        end
+    elseif event == "RAID_TARGET_UPDATE" then
+        for _, b in ipairs(self.buttons) do
+            if b:IsShown() then self:UpdateButton(b) end
         end
     elseif unit then
         for _, b in ipairs(self.buttons) do if b.unit == unit then self:UpdateButton(b) end end

@@ -9,13 +9,14 @@ Inspired by classic grid-based and bar-style healing interfaces, **PB: Healing F
 ## ✨ Key Features
 
 ### 🔲 Dual Layout Modes
-Choose between a compact **Grid Mode** for large-scale raiding or a classic **Bars Mode** for traditional group management. Each mode is independently configurable for size, scale, and spacing.
+Choose between a compact **Grid Mode** for large-scale raiding or a classic **Bars Mode** for traditional group management. Lay out each style horizontally or vertically, pick how many units appear per row, and scale every group independently without touching Lua.
 
 ### 🎨 Smart Visuals
 - **Dynamic Health Colors**: Instant visual feedback with Healthy (Green), Injured (Yellow), and Critical (Red) states.
 - **Curable Debuff Highlighting**: Frames change color based on the type of debuff you can personally cleanse (Magic, Curse, Disease, Poison).
-- **Incoming Heal Predictions**: Full `HealComm` integration allows you to see incoming heals from yourself and others, preventing over-healing.
-- **Aura Indicators**: Four configurable corner positions to track HoTs, shields, and defensive buffs.
+- **Incoming Heal Predictions**: Full `HealComm` integration prevents over-healing.
+- **Animated HoT Tracking**: Priority-based indicators hug the bar edges (2×2 on bars, 2×1 on grid) with a subtle glow so your Rejuvenations and Earth Shields are impossible to miss.
+- **Raid Target Badges**: Optional raid icons pop off the top-left corner of every frame—perfect for calling out main tanks or kill targets at a glance.
 
 ### ⚡ Built-in Click-Casting
 No need for external addons like Clique.
@@ -24,7 +25,7 @@ No need for external addons like Clique.
 - **Modifier Support**: Use Shift, Ctrl, and Alt modifiers to expand your available bindings per unit.
 
 ### 🧪 Advanced Setup Tools
-- **Test Mode**: Spawn fake raid members with simulated health fluctuation and aura timers to perfect your UI layout before the pull.
+- **Test Mode**: Spawn fake raid members with smooth, animated health swings, rotating debuffs, live HoT timers, and preview raid icons so you know exactly how the frames will behave mid-fight.
 - **Spell Scanning**: Intelligent spellbook scanning ensures your newest ranks and custom abilities are always ready to be bound.
 
 ---
@@ -51,6 +52,7 @@ No need for external addons like Clique.
 | `/pb scan` | Force a refresh of your known spells |
 | `/pb smartbind` | Run the automatic spell binding logic |
 | `/pb test [5-40]` | Toggle test mode with a specific number of units |
+| `/pb debug [on|off|auras <unit>]` | Enable logging or dump aura info for a unit |
 | `/pb lock` / `/pb unlock` | Toggle frame movement |
 
 ---

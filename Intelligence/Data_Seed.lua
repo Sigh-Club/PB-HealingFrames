@@ -180,3 +180,7 @@ HI.smartBindPriorities = {
         { name = "Regrowth", priority = 4 },
     }
 }
+
+HI.meta = HI.meta or {}
+HI.meta.source = "seed"
+if ns.NotifyIntelUpdated then ns:NotifyIntelUpdated("seed") end

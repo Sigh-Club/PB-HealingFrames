@@ -37,6 +37,26 @@ SlashCmdList["PBHF"] = function(msg)
         else
             if ns.Roster then ns.Roster:SetFakeMode(true, n or 10) end
         end
+    elseif msg:match("^debug") then
+        local args = trim(msg:sub(6))
+        if args == "" then
+            ns:Print("Usage: /pb debug [on|off|auras <unit>]")
+        elseif args == "on" then
+            if ns.Debug and ns.Debug.SetEnabled then ns.Debug:SetEnabled(true) end
+        elseif args == "off" then
+            if ns.Debug and ns.Debug.SetEnabled then ns.Debug:SetEnabled(false) end
+        else
+            local unit = args:match("^auras%s+(%S+)")
+            if unit then
+                if ns.Auras and ns.Auras.DumpUnitAuras then
+                    ns.Auras:DumpUnitAuras(unit)
+                else
+                    ns:Print("Auras module not available.")
+                end
+            else
+                ns:Print("Usage: /pb debug [on|off|auras <unit>]")
+            end
+        end
     elseif msg == "lock" then
         ns.DB.locked = true; ns:Print("Frames Locked.")
     elseif msg == "unlock" then
