@@ -7,6 +7,8 @@ local buttonMap = {
     LeftButton = "1",
     RightButton = "2",
     MiddleButton = "3",
+    MouseWheelUp = "6",
+    MouseWheelDown = "7",
     Button4 = "4",
     Button5 = "5",
 }

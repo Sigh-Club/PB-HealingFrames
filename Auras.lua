@@ -7,16 +7,34 @@ local positionMap = {}
 local function collectActiveAuras(unit)
     local active = {}
     if not unit then return active end
+    
+    -- Scan Buffs (Helpful)
     for i = 1, 40 do
         local name, _, icon, count, _, duration, expirationTime, caster = UnitAura(unit, i, "HELPFUL")
         if not name then break end
-        if caster == "player" then
-            local pos = positionMap[string.lower(name)]
-            if pos and not active[pos] then
+        
+        local lname = string.lower(name)
+        local pos = positionMap[lname]
+        
+        -- Track if it's from player OR if it's an important buff we track (like Beacon)
+        if pos and not active[pos] then
+            if caster == "player" or caster == "pet" or not caster then
                 active[pos] = { icon = icon, count = count, duration = duration, expires = expirationTime }
             end
         end
     end
+    
+    -- Also scan for the center icon if it's a debuff we care about
+    for i = 1, 40 do
+        local name, _, icon, count, dtype, duration, expirationTime = UnitAura(unit, i, "HARMFUL")
+        if not name then break end
+        
+        local lname = string.lower(name)
+        if positionMap[lname] == "center" then
+            active.center = { icon = icon, count = count, duration = duration, expires = expirationTime }
+        end
+    end
+    
     return active
 end
 

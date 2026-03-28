@@ -7,6 +7,8 @@ local orderedSlots = {
     "LeftButton",
     "RightButton",
     "MiddleButton",
+    "MouseWheelUp",
+    "MouseWheelDown",
     "Button4",
     "Button5",
     "Shift-LeftButton",
