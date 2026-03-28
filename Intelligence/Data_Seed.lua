@@ -15,7 +15,7 @@ HI.design_principles = {
 
 HI.roleSpellIds = {
     direct_heal = { 2050, 2054, 2060, 2061, 635, 19750, 331, 8004, 8005, 5185, 8936, 50464, 1064, 596, 34861, 48785 },
-    hot = { 139, 774, 33763, 48438, 61295, 33076 },
+    hot = { 139, 774, 33763, 48438, 61295, 33076, 115151, 124682, 124081, 116670, 73920, 61295, 52042 },
     shield_absorb = { 17, 47515, 53563, 53601, 974 },
     cleanse = { 4987, 527, 528, 552, 475, 2782, 2893, 8946, 51886 },
     resurrection = { 2006, 7328, 50769, 20484, 20773 },
@@ -48,7 +48,9 @@ HI.roleSpellNames = {
         "Healing Touch", "Regrowth", "Nourish", "Chain Heal", "Prayer of Healing", "Circle of Life", "Swiftmend"
     },
     hot = {
-        "Renew", "Rejuvenation", "Lifebloom", "Wild Growth", "Riptide", "Prayer of Mending"
+        "Renew", "Rejuvenation", "Lifebloom", "Wild Growth", "Riptide", "Prayer of Mending",
+        "Renewing Mist", "Enveloping Mist", "Soothing Mist", "Chi Wave", "Chi Burst",
+        "Healing Rain", "Healing Stream Totem", "Cloudburst Totem"
     },
     shield_absorb = {
         "Power Word: Shield", "Sacred Shield", "Earth Shield", "Divine Aegis", "Beacon of Light"
