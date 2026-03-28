@@ -53,9 +53,20 @@ No need for external addons like Clique.
 | `/pb smartbind` | Run the automatic spell binding logic |
 | `/pb test [5-40]` | Toggle test mode with a specific number of units |
 | `/pb debug [on|off|auras <unit>]` | Enable logging or dump aura info for a unit |
+| `/pb sample [on|off|export|clear]` | Collect and export aura data to share with the devs |
 | `/pb lock` / `/pb unlock` | Toggle frame movement |
 
 ---
+
+## 🤝 Share Ascension Aura Data
+Helping us keep the HoT database current is as simple as running a sampler during your dungeon or raid:
+
+1. Type `/pb sample on` (you’ll get a confirmation message).
+2. Heal/play normally for a few minutes so the addon can see your buffs.
+3. Type `/pb sample export` and copy the printed list.
+4. DM the output to **Talzanar** on Discord.
+
+Use `/pb sample off` when you’re done (and `/pb sample clear` if you want to wipe the log). Every submission helps us support more Ascension-only spells without extra guesswork.
 
 ## 🛠️ Credits & Inspirations
 Inspired by the utility of Grid, the aesthetic of VuhDo, and the simplicity of HealBot. Built for healers who want maximum efficiency with minimum bloat.

@@ -8,6 +8,7 @@ local centerNames = {}
 local centerIds = {}
 local auraCache = {}
 local collectActiveAuras
+local samplingEnabled = false
 local fallbackTrackedAuras = {
     topleft = {
         774, 26982, 139, 61295, 61299, 53601, 33763,
@@ -22,6 +23,39 @@ local fallbackTrackedAuras = {
     bottomright = { 2893, 6346, 33206, 47788 },
     center = { 53563, 974, "Beacon of Light", "Beacon of Virtue" },
 }
+
+local function getSampleBucket()
+    PB_HF_Global = PB_HF_Global or {}
+    PB_HF_Global.auraSamples = PB_HF_Global.auraSamples or {}
+    return PB_HF_Global.auraSamples
+end
+
+local function logAuraSample(unit, name, spellId, caster)
+    if not name then return end
+    local bucket = getSampleBucket()
+    local key = spellId or string.lower(name)
+    local entry = bucket[key]
+    if not entry then
+        entry = { name = name, spellId = spellId, count = 0, units = {}, casters = {} }
+        bucket[key] = entry
+    end
+    entry.count = entry.count + 1
+    entry.units[unit or "?"] = true
+    if caster then
+        local casterName = UnitName(caster) or caster
+        entry.casters[casterName or "?"] = true
+    end
+    entry.lastSeen = time()
+end
+
+local function recordSamples(unit)
+    if not samplingEnabled or not unit then return end
+    for i = 1, 40 do
+        local name, _, _, _, _, _, _, caster, _, _, spellId = UnitAura(unit, i, "HELPFUL")
+        if not name then break end
+        logAuraSample(unit, name, spellId, caster)
+    end
+end
 
 local function addHotEntry(entry, priority)
     local kind = type(entry)
@@ -305,6 +339,7 @@ end
 
 function Auras:OnInitialize()
     rebuildTrackedNames()
+    samplingEnabled = PB_HF_Global and PB_HF_Global.auraSamplingEnabled or false
     if ns.RegisterIntelListener then
         ns:RegisterIntelListener(function(reason)
             rebuildTrackedNames()
@@ -409,6 +444,9 @@ end
 
 function Auras:OnEvent(event, unit)
     if event == "UNIT_AURA" then
+        if samplingEnabled and unit then
+            recordSamples(unit)
+        end
         if not unit then return end
         local cache = scanAndStore(unit)
         if ns.Frames and ns.Frames.GetButtonForUnit then
@@ -426,5 +464,67 @@ function Auras:OnEvent(event, unit)
                 end
             end
         end
+    end
+end
+
+function Auras:IsSamplingEnabled()
+    return samplingEnabled
+end
+
+function Auras:SetSamplingEnabled(flag)
+    PB_HF_Global = PB_HF_Global or {}
+    PB_HF_Global.auraSamplingEnabled = flag and true or false
+    samplingEnabled = PB_HF_Global.auraSamplingEnabled
+    if flag then
+        ns:Print("Aura sampling enabled. Heal as normal, then use /pb sample export and DM @Talzanar on Discord.")
+    else
+        ns:Print("Aura sampling disabled.")
+    end
+end
+
+function Auras:ClearSamples()
+    local bucket = getSampleBucket()
+    wipe(bucket)
+    ns:Print("Aura sample log cleared.")
+end
+
+function Auras:ExportSamples()
+    local bucket = getSampleBucket()
+    local count = 0
+    ns:Print("Aura Samples — copy the list below and DM Talzanar on Discord:")
+    for _, entry in pairs(bucket) do
+        count = count + 1
+        local casterList = {}
+        if entry.casters then
+            for casterName in pairs(entry.casters) do table.insert(casterList, casterName) end
+        end
+        table.sort(casterList)
+        ns:Print(string.format(" - %s (id=%s, seen=%d)%s",
+            entry.name or "?",
+            entry.spellId or "?",
+            entry.count or 0,
+            #casterList > 0 and (" casters:" .. table.concat(casterList, ",")) or ""))
+    end
+    if count == 0 then
+        ns:Print("No aura samples recorded yet. Use /pb sample on and continue healing.")
+    end
+end
+
+function Auras:HandleSampleCommand(args)
+    args = args or ""
+    if args == "" or args == "help" then
+        ns:Print("Usage: /pb sample [on|off|export|clear]")
+        return
+    end
+    if args == "on" then
+        self:SetSamplingEnabled(true)
+    elseif args == "off" then
+        self:SetSamplingEnabled(false)
+    elseif args == "export" then
+        self:ExportSamples()
+    elseif args == "clear" then
+        self:ClearSamples()
+    else
+        ns:Print("Usage: /pb sample [on|off|export|clear]")
     end
 end

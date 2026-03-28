@@ -112,6 +112,8 @@ local function EnsureSaved()
     if ns.DB.enabled == nil then ns.DB.enabled = true end
     
     PB_HF_Global = PB_HF_Global or {}
+    PB_HF_Global.auraSamples = PB_HF_Global.auraSamples or {}
+    if PB_HF_Global.auraSamplingEnabled == nil then PB_HF_Global.auraSamplingEnabled = false end
 end
 
 function ns:SetEnabled(v)

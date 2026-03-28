@@ -57,11 +57,18 @@ SlashCmdList["PBHF"] = function(msg)
                 ns:Print("Usage: /pb debug [on|off|auras <unit>]")
             end
         end
+    elseif msg:match("^sample") then
+        local args = trim(msg:sub(7))
+        if ns.Auras and ns.Auras.HandleSampleCommand then
+            ns.Auras:HandleSampleCommand(args)
+        else
+            ns:Print("Aura sampling module unavailable.")
+        end
     elseif msg == "lock" then
         ns.DB.locked = true; ns:Print("Frames Locked.")
     elseif msg == "unlock" then
         ns.DB.locked = false; ns:Print("Frames Unlocked.")
     else
-        ns:Print("Usage: /pb [config|scan|smartbind|test 5-40|lock|unlock]")
+        ns:Print("Usage: /pb [config|scan|smartbind|test 5-40|debug|sample|lock|unlock]")
     end
 end
