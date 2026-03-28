@@ -128,7 +128,7 @@ collectActiveAuras = function(unit)
     if not unit or not UnitExists(unit) then return active end
     if not hasTrackedData() then rebuildTrackedNames() end
 
-    local hotMatches = {}
+    local hotBuckets = {}
     for i = 1, 40 do
         local name, _, icon, count, _, duration, expirationTime, caster, _, _, spellId = UnitAura(unit, i, "HELPFUL")
         if not name then break end
@@ -142,10 +142,9 @@ collectActiveAuras = function(unit)
         end
 
         local priority = (spellId and hotPriorityIds[spellId]) or hotPriorityNames[lname]
-        if priority and priority <= 4 then
-            if isMine and not hotMatches[priority] then
-                hotMatches[priority] = { icon = icon, count = count, duration = duration, expires = expirationTime }
-            end
+        if priority and priority <= 4 and isMine then
+            hotBuckets[priority] = hotBuckets[priority] or {}
+            table.insert(hotBuckets[priority], { icon = icon, count = count, duration = duration, expires = expirationTime })
         end
 
         local isCenter = (spellId and centerIds[spellId]) or centerNames[lname]
@@ -154,10 +153,16 @@ collectActiveAuras = function(unit)
         end
     end
 
-    for i = 1, 4 do
-        if hotMatches[i] then
-            table.insert(active.hotList, hotMatches[i])
+    local maxSlots = 4
+    for prio = 1, 4 do
+        local bucket = hotBuckets[prio]
+        if bucket then
+            for _, entry in ipairs(bucket) do
+                table.insert(active.hotList, entry)
+                if #active.hotList >= maxSlots then break end
+            end
         end
+        if #active.hotList >= maxSlots then break end
     end
     if UnitIsUnit(unit, "player") and ns.Roster and ns.Roster.fakeIcons then
         local guid = UnitGUID(unit)
