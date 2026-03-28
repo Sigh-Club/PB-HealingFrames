@@ -5,6 +5,7 @@ ns.Frames = Frames
 Frames.container = nil
 Frames.buttons = {}
 Frames.MAX = 40
+Frames.queue = {}
 
 local classColors = RAID_CLASS_COLORS or {}
 local STATUS_BAR_TEX = "Interface\\TargetingFrame\\UI-StatusBar"
@@ -473,6 +474,7 @@ function Frames:UpdateButton(b)
         local cc = classColors[fake.classToken or "PRIEST"]
         b.nameText:SetTextColor(cc.r, cc.g, cc.b)
         threat = (b.index % 7 == 0) and 3 or 0
+        b.nameText:SetText(name) -- Bypass ShortenName for fake units to see texture names
     else
         if not unit or not UnitExists(unit) then return end
         name, hp, maxhp = UnitName(unit), UnitHealth(unit), UnitHealthMax(unit)
@@ -493,6 +495,8 @@ function Frames:UpdateButton(b)
 
         if UnitIsDeadOrGhost(unit) then status = "DEAD"
         elseif not UnitIsConnected(unit) then status = "OFFLINE" end
+        
+        b.nameText:SetText(ShortenName(name))
     end
 
     b.hp:SetMinMaxValues(0, maxhp)
@@ -509,17 +513,19 @@ function Frames:UpdateButton(b)
         r, g, bl = cc.r, cc.g, cc.b
     end
 
+    if fake and fake.texturePath then
+        b.hp:SetStatusBarTexture(fake.texturePath)
+        b.incHeal:SetStatusBarTexture(fake.texturePath)
+    else
+        local tex = dbf.barTexture or STATUS_BAR_TEX
+        b.hp:SetStatusBarTexture(tex)
+        b.incHeal:SetStatusBarTexture(tex)
+    end
+
     if dbf.invertedColors then
-        b.bg:SetVertexColor(r * 0.4, g * 0.4, bl * 0.4, 0.9)
-        b.hp:SetStatusBarColor(0, 0, 0, 0.8)
-        -- In inverted mode, we want the health bar to represent the REMAINING health but look like a "gap"?
-        -- Actually, usually Inverted/Deficit means the background is the color and the bar is the deficit.
-        -- Let's stick to: Background = Dark Class Color, Bar = Black/Dark (Current HP) 
-        -- No, that's not intuitive. 
-        -- Correct Deficit Style: Background = Class Color, Bar = Black (Missing HP).
         b.bg:SetVertexColor(r, g, bl, 0.9)
         b.hp:SetStatusBarColor(0, 0, 0, 0.8)
-        b.hp:SetValue(maxhp - hp) -- Filling missing health with black
+        b.hp:SetValue(maxhp - hp)
     else
         b.bg:SetVertexColor(0, 0, 0, 0.95)
         b.hp:SetStatusBarColor(r, g, bl, 0.9)
@@ -554,8 +560,6 @@ function Frames:UpdateButton(b)
         b.glow:Hide()
     end
 
-    b.nameText:SetText(ShortenName(name))
-    
     if not fake and unit and UnitIsUnit(unit, "target") then
         b.targetGlow:Show()
     else
@@ -600,6 +604,8 @@ function Frames:OnEnable() self:ApplyLayout() end
 function Frames:OnEvent(event, unit) 
     if event == "PLAYER_ENTERING_WORLD" or event == "PARTY_MEMBERS_CHANGED" or event == "RAID_ROSTER_UPDATE" then
         self:ApplyLayout() 
+    elseif event == "PLAYER_REGEN_ENABLED" then
+        processQueue()
     elseif event == "PLAYER_TARGET_CHANGED" then
         for _, b in ipairs(self.buttons) do 
             if b:IsShown() and b.unit then self:UpdateButton(b) end 

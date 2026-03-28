@@ -12,6 +12,11 @@ local testNames = {
     "Moonquartz", "Gravewillow", "Skydrift", "Thornwatch", "Silverreed", "Auricvale", "Dreamfen", "Brassroot"
 }
 
+local customTextures = {
+    "ArtDeco", "Fragment", "Graffiti1", "graffiti2", "graffiti3", "Rusty", "RustyV2",
+    "steelv2", "Steelv3", "steelv4", "Steelv5", "Steelv6", "Steelv7"
+}
+
 local function buildLiveList()
     wipe(Roster.entries)
     if UnitInRaid("player") then
@@ -33,13 +38,17 @@ local function buildFakeList(size)
     wipe(Roster.entries)
     local debuffTypes = { "Magic", "Curse", "Poison", "Disease" }
     for i = 1, size do
+        local texName = customTextures[(i-1) % #customTextures + 1]
+        local texPath = "Interface\\AddOns\\PB_HealingFrames\\Media\\Textures\\" .. texName .. ".tga"
+        
         table.insert(Roster.entries, {
             unit = nil,
-            name = testNames[i] or ("Player"..i),
+            name = texName or testNames[i] or ("Player"..i),
             group = math.floor((i-1)/5) + 1,
             fake = true,
             classToken = ({"PRIEST", "PALADIN", "SHAMAN", "DRUID", "MAGE", "WARLOCK", "ROGUE", "WARRIOR"})[(i-1)%8 + 1],
-            fakeDebuff = (i % 4 == 0) and debuffTypes[(i/4)%4 + 1] or nil
+            fakeDebuff = (i % 4 == 0) and debuffTypes[(i/4)%4 + 1] or nil,
+            texturePath = texPath
         })
     end
 end
