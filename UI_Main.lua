@@ -611,15 +611,12 @@ end
 
 local bindCaptureFrame
 
-local function CreateBindCapture(parent)
-    if bindCaptureFrame then 
-        bindCaptureFrame:SetParent(parent)
-        return bindCaptureFrame 
-    end
+local function CreateBindCapture()
+    if bindCaptureFrame then return bindCaptureFrame end
     
     local f = CreateFrame("Frame", "PB_BindCapture", UIParent)
-    f:SetSize(250, 100)
-    f:SetFrameStrata("DIALOG")
+    f:SetSize(300, 80)
+    f:SetFrameStrata("TOOLTIP") -- Highest strata
     f:Hide()
     CreateFrameBackdrop(f)
     f:SetBackdropColor(0.1, 0.1, 0.1, 0.95)
@@ -631,44 +628,48 @@ local function CreateBindCapture(parent)
 
     local help = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     help:SetPoint("TOP", txt, "BOTTOM", 0, -5)
-    help:SetText("Press Mouse, Wheel,\nor Key (with modifiers)")
+    help:SetText("Press Mouse, Wheel, or Key")
     f.help = help
     
     local cancel = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
     cancel:SetSize(80, 20); cancel:SetPoint("BOTTOM", 0, 10); cancel:SetText("Cancel")
     cancel:SetScript("OnClick", function() f:Hide() end)
     
-    f:EnableMouse(true)
-    f:EnableKeyboard(true)
-    f:SetScript("OnMouseDown", function(self, button)
+    -- Full-screen input blocker
+    local blocker = CreateFrame("Frame", nil, f)
+    blocker:SetAllPoints(UIParent)
+    blocker:SetFrameLevel(f:GetFrameLevel() - 1)
+    blocker:EnableMouse(true)
+    blocker:EnableKeyboard(true)
+    
+    blocker:SetScript("OnMouseDown", function(self, button)
         local mods = ""
         if IsShiftKeyDown() then mods = mods .. "Shift-" end
         if IsControlKeyDown() then mods = mods .. "Ctrl-" end
         if IsAltKeyDown() then mods = mods .. "Alt-" end
-        self:Hide()
-        if self.callback then self.callback(mods .. button) end
+        f:Hide()
+        if f.callback then f.callback(mods .. button) end
     end)
 
-    f:EnableMouseWheel(true)
-    f:SetScript("OnMouseWheel", function(self, delta)
+    blocker:SetScript("OnMouseWheel", function(self, delta)
         local mods = ""
         if IsShiftKeyDown() then mods = mods .. "Shift-" end
         if IsControlKeyDown() then mods = mods .. "Ctrl-" end
         if IsAltKeyDown() then mods = mods .. "Alt-" end
         local button = (delta > 0) and "MouseWheelUp" or "MouseWheelDown"
-        self:Hide()
-        if self.callback then self.callback(mods .. button) end
+        f:Hide()
+        if f.callback then f.callback(mods .. button) end
     end)
 
-    f:SetScript("OnKeyDown", function(self, key)
-        if key == "ESCAPE" then self:Hide(); return end
+    blocker:SetScript("OnKeyDown", function(self, key)
+        if key == "ESCAPE" then f:Hide(); return end
         if key == "LSHIFT" or key == "RSHIFT" or key == "LCTRL" or key == "RCTRL" or key == "LALT" or key == "RALT" then return end
         local mods = ""
         if IsShiftKeyDown() then mods = mods .. "Shift-" end
         if IsControlKeyDown() then mods = mods .. "Ctrl-" end
         if IsAltKeyDown() then mods = mods .. "Alt-" end
-        self:Hide()
-        if self.callback then self.callback(mods .. key) end
+        f:Hide()
+        if f.callback then f.callback(mods .. key) end
     end)
     
     bindCaptureFrame = f
@@ -682,11 +683,11 @@ function UI:LoadKeybinds(c)
     local title = c:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOPLEFT", 15, y); title:SetText("Keybinds")
     
-    -- Positioning the capture frame hook precisely to the right of the title
-    local captureContainer = CreateFrame("Frame", nil, c)
-    captureContainer:SetSize(250, 100)
-    captureContainer:SetPoint("TOPLEFT", title, "TOPRIGHT", 20, 15)
-    c.captureContainer = captureContainer
+    -- Location where the capture UI will be anchored
+    local captureAnchor = CreateFrame("Frame", nil, c)
+    captureAnchor:SetSize(300, 80)
+    captureAnchor:SetPoint("TOPLEFT", title, "TOPRIGHT", 20, 10)
+    c.captureAnchor = captureAnchor
 
     y = y - 45
 
@@ -701,9 +702,9 @@ function UI:LoadKeybinds(c)
     local addBind = CreateFrame("Button", nil, c, "UIPanelButtonTemplate")
     addBind:SetSize(160, 28); addBind:SetPoint("LEFT", smart, "RIGHT", 15, 0); addBind:SetText("Add Binding")
     addBind:SetScript("OnClick", function()
-        local capture = CreateBindCapture(captureContainer)
+        local capture = CreateBindCapture()
         capture:ClearAllPoints()
-        capture:SetPoint("CENTER", captureContainer, "CENTER", 0, 0)
+        capture:SetPoint("CENTER", captureAnchor, "CENTER", 0, 0)
         capture.callback = function(slot)
             if not spellPickerFrame then CreateSpellPicker() end
             spellPickerFrame:Open(slot, addBind)
