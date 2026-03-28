@@ -316,21 +316,26 @@ function Frames:CreateAnchor(id)
     local dbf = ns.DB.frame
     if id then
         local pos = dbf.groupPositions[id]
-        if pos then
+        if pos and pos.x then
             f:ClearAllPoints()
-            f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", pos.x, pos.y)
+            f:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", pos.x, pos.y)
         else
             f:SetPoint("CENTER", -200 + (id-1)*60, 100)
         end
     else
-        f:SetPoint("CENTER")
+        if dbf.x then
+            f:ClearAllPoints()
+            f:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", dbf.x, dbf.y)
+        else
+            f:SetPoint("CENTER")
+        end
     end
 
     f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton")
     f:SetScript("OnDragStart", function(s) if not ns.DB.locked then s:StartMoving() end end)
     f:SetScript("OnDragStop", function(s) 
         s:StopMovingOrSizing()
-        local _, _, _, x, y = s:GetPoint()
+        local x, y = s:GetLeft(), s:GetBottom()
         if id then
             dbf.groupPositions[id] = { x = x, y = y }
         else
@@ -339,12 +344,19 @@ function Frames:CreateAnchor(id)
         end
     end)
 
-    local tex = f:CreateTexture(nil, "BACKGROUND")
-    tex:SetAllPoints(); tex:SetTexture(0,0,0,0.2)
+    if not f.bg then
+        local bg = f:CreateTexture(nil, "BACKGROUND")
+        bg:SetAllPoints()
+        bg:SetTexture(0, 0, 0, 0.4)
+        f.bg = bg
+    end
     
-    local lbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    lbl:SetPoint("CENTER"); lbl:SetText(id and ("G" .. id) or "PB:HF")
-    f.label = lbl
+    if not f.label then
+        local lbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        lbl:SetPoint("CENTER")
+        f.label = lbl
+    end
+    f.label:SetText(id and ("G" .. id) or "PB:HF")
 
     f:Show()
     return f
@@ -354,18 +366,50 @@ function Frames:EnsureAnchors()
     local dbf = ns.DB.frame
     if not self.container then self.container = self:CreateAnchor() end
     
-    if dbf.splitGroups then
+    if not ns.DB.enabled then
         self.container:Hide()
+        for i = 1, 8 do
+            if self.anchors[i] then self.anchors[i]:Hide() end
+        end
+        return
+    end
+
+    -- The master container (PB_HF_Anchor) must ALWAYS be shown if addon is enabled,
+    -- because it is the parent of all unit buttons.
+    self.container:Show()
+
+    if dbf.splitGroups then
+        -- Hide visual parts of master container
+        self.container.bg:Hide()
+        self.container.label:Hide()
+        
         for i = 1, 8 do
             if not self.anchors[i] then
                 self.anchors[i] = self:CreateAnchor(i)
             end
             self.anchors[i]:Show()
+            self.anchors[i].bg:Show()
+            self.anchors[i].label:Show()
         end
     else
-        self.container:Show()
+        -- Show visual parts of master container
+        self.container.bg:Show()
+        self.container.label:Show()
+        
         for i = 1, 8 do
             if self.anchors[i] then self.anchors[i]:Hide() end
+        end
+    end
+    
+    -- If locked, hide all anchor visuals
+    if ns.DB.locked then
+        self.container.bg:Hide()
+        self.container.label:Hide()
+        for i = 1, 8 do
+            if self.anchors[i] then
+                self.anchors[i].bg:Hide()
+                self.anchors[i].label:Hide()
+            end
         end
     end
 end

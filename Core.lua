@@ -103,11 +103,9 @@ end
 
 function ns:SetEnabled(v)
     ns.DB.enabled = v
+    if ns.Frames then ns.Frames:ApplyLayout() end
     if v then
-        if ns.Frames and ns.Frames.container then ns.Frames.container:Show() end
         if ns.Roster then ns.Roster:Refresh() end
-    else
-        if ns.Frames and ns.Frames.container then ns.Frames.container:Hide() end
     end
 end
 
@@ -120,7 +118,8 @@ local function Bootstrap()
     EnsureSaved()
     ns:IterModules("OnInitialize")
     ns:IterModules("OnEnable")
-    ns:Print("V 1.0 beta loaded. Type /pb for config.")
+    local status = ns.DB.enabled and "" or " (|cffff4444Disabled|r)"
+    ns:Print("V 1.1 beta loaded. Type /pb for config." .. status)
 end
 
 local frame = CreateFrame("Frame")
