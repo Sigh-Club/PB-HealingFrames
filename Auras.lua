@@ -54,6 +54,11 @@ function Auras:UpdateButtonAuras(btn, cached)
             local expires = t + (dur - ((t + offset) % dur))
             active.bottomright = { icon = "Interface\\Icons\\Spell_Nature_HealingWave", count = 0, duration = dur, expires = expires }
         end
+        
+        -- Add a fake center debuff for demonstration in test mode
+        if (group == 5) then
+            active.center = { icon = "Interface\\Icons\\Spell_Shadow_ShadowWordPain", count = 0, duration = 30, expires = t + 15 }
+        end
     elseif btn.unit then
         active = active or collectActiveAuras(btn.unit)
     end

@@ -52,6 +52,8 @@ local function defaults()
                 Disease = { 0.60, 0.40, 0.00 },
                 Poison = { 0.00, 0.75, 0.20 },
             },
+            barTexture = "Interface\\TargetingFrame\\UI-StatusBar",
+            invertedColors = false,
         },
         scan = {
             excludeGeneral = true,

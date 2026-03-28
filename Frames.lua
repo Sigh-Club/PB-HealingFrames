@@ -131,7 +131,8 @@ local function CreateButton(i)
     -- 1. Background (Bottom Layer)
     local bg = b:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints()
-    bg:SetTexture(0, 0, 0, 0.95)
+    bg:SetTexture(SOLID_TEX)
+    bg:SetVertexColor(0, 0, 0, 0.95)
     b.bg = bg
 
     -- 1a. Border for Bars mode
@@ -236,7 +237,24 @@ local function CreateButton(i)
     targetGlow:Hide()
     b.targetGlow = targetGlow
 
-    -- 5b. Hover Highlight
+    -- 5b. Threat Glow (Red inner border)
+    local threatGlow = CreateFrame("Frame", nil, b)
+    threatGlow:SetPoint("TOPLEFT", 1, -1)
+    threatGlow:SetPoint("BOTTOMRIGHT", -1, 1)
+    threatGlow:SetFrameLevel(b:GetFrameLevel() + 6)
+    threatGlow:EnableMouse(false)
+    local thTop = threatGlow:CreateTexture(nil, "OVERLAY")
+    thTop:SetPoint("TOPLEFT"); thTop:SetPoint("TOPRIGHT"); thTop:SetHeight(2); thTop:SetTexture(1, 0, 0, 1)
+    local thBottom = threatGlow:CreateTexture(nil, "OVERLAY")
+    thBottom:SetPoint("BOTTOMLEFT"); thBottom:SetPoint("BOTTOMRIGHT"); thBottom:SetHeight(2); thBottom:SetTexture(1, 0, 0, 1)
+    local thLeft = threatGlow:CreateTexture(nil, "OVERLAY")
+    thLeft:SetPoint("TOPLEFT"); thLeft:SetPoint("BOTTOMLEFT"); thLeft:SetWidth(2); thLeft:SetTexture(1, 0, 0, 1)
+    local thRight = threatGlow:CreateTexture(nil, "OVERLAY")
+    thRight:SetPoint("TOPRIGHT"); thRight:SetPoint("BOTTOMRIGHT"); thRight:SetWidth(2); thRight:SetTexture(1, 0, 0, 1)
+    threatGlow:Hide()
+    b.threatGlow = threatGlow
+
+    -- 5c. Hover Highlight
     local hover = b:CreateTexture(nil, "HIGHLIGHT")
     hover:SetAllPoints()
     hover:SetTexture(1, 1, 1, 0.1)
@@ -278,7 +296,11 @@ local function CreateButton(i)
         topright = CreateAuraIndicator(inter, "TOPRIGHT", -2, -2),
         bottomleft = CreateAuraIndicator(inter, "BOTTOMLEFT", 2, 2),
         bottomright = CreateAuraIndicator(inter, "BOTTOMRIGHT", -2, 2),
+        center = CreateAuraIndicator(inter, "CENTER", 0, 0),
     }
+    b.auraIndicators.center:SetSize(20, 20)
+    b.auraIndicators.center.icon:SetTexCoord(0, 1, 0, 1) -- Fuller icon for center
+    b.auraIndicators.center:SetFrameLevel(inter:GetFrameLevel() + 5)
 
     b:SetScript("OnEnter", function(self)
         if self.unit and UnitExists(self.unit) then
@@ -330,12 +352,16 @@ function Frames:ApplyLayout()
     local dbf = ns.DB.frame
     local isGrid = dbf.layoutStyle == "grid"
     local cfg = isGrid and dbf.grid or dbf.bars
+    local tex = dbf.barTexture or STATUS_BAR_TEX
     
     self.container:SetScale(cfg.scale or 1)
 
     for i = 1, self.MAX do
         local b = self.buttons[i] or CreateButton(i)
         self.buttons[i] = b
+        
+        b.hp:SetStatusBarTexture(tex)
+        b.incHeal:SetStatusBarTexture(tex)
         
         if isGrid then
             b:SetSize(cfg.size or 40, cfg.size or 40)
@@ -418,14 +444,15 @@ local function ShortenName(name)
     local isGrid = dbf.layoutStyle == "grid"
     local cfg = isGrid and dbf.grid or dbf.bars
     if not cfg.shortenNames then return name end
-    local len = math.max(4, math.min(6, tonumber(cfg.nameLength) or 6))
+    local len = tonumber(cfg.nameLength) or (isGrid and 6 or 12)
     if not name or string.len(name) <= len then return name end
+    
     if len <= 4 then
         return string.sub(name, 1, len)
-    elseif len == 5 then
-        return string.sub(name, 1, 4) .. "~"
-    else
+    elseif len <= 6 then
         return string.sub(name, 1, 4) .. string.sub(name, -1, -1)
+    else
+        return string.sub(name, 1, len-1) .. "~"
     end
 end
 
@@ -434,7 +461,7 @@ function Frames:UpdateButton(b)
     local unit = b.unit
     local fake = b.fakeData
     local dbf = ns.DB.frame
-    local name, hp, maxhp, pct, debuff, mana, maxmana, status, role
+    local name, hp, maxhp, pct, debuff, mana, maxmana, status, role, threat
 
     if fake then
         name = fake.name
@@ -445,6 +472,7 @@ function Frames:UpdateButton(b)
         if fake.fakeDebuff then debuff = { dtype = fake.fakeDebuff } end
         local cc = classColors[fake.classToken or "PRIEST"]
         b.nameText:SetTextColor(cc.r, cc.g, cc.b)
+        threat = (b.index % 7 == 0) and 3 or 0
     else
         if not unit or not UnitExists(unit) then return end
         name, hp, maxhp = UnitName(unit), UnitHealth(unit), UnitHealthMax(unit)
@@ -461,6 +489,8 @@ function Frames:UpdateButton(b)
             if raidRole == "MAINTANK" then role = "TANK" end
         end
 
+        threat = UnitThreatSituation(unit) or 0
+
         if UnitIsDeadOrGhost(unit) then status = "DEAD"
         elseif not UnitIsConnected(unit) then status = "OFFLINE" end
     end
@@ -470,7 +500,31 @@ function Frames:UpdateButton(b)
     b.incHeal:SetMinMaxValues(0, maxhp)
     
     local r, g, bl = healthColor(pct)
-    b.hp:SetStatusBarColor(r, g, bl, 0.9)
+    if dbf.useClassColors and not fake and unit then
+        local _, class = UnitClass(unit)
+        local cc = classColors[class] or {r=1, g=1, b=1}
+        r, g, bl = cc.r, cc.g, cc.b
+    elseif dbf.useClassColors and fake then
+        local cc = classColors[fake.classToken or "PRIEST"]
+        r, g, bl = cc.r, cc.g, cc.b
+    end
+
+    if dbf.invertedColors then
+        b.bg:SetVertexColor(r * 0.4, g * 0.4, bl * 0.4, 0.9)
+        b.hp:SetStatusBarColor(0, 0, 0, 0.8)
+        -- In inverted mode, we want the health bar to represent the REMAINING health but look like a "gap"?
+        -- Actually, usually Inverted/Deficit means the background is the color and the bar is the deficit.
+        -- Let's stick to: Background = Dark Class Color, Bar = Black/Dark (Current HP) 
+        -- No, that's not intuitive. 
+        -- Correct Deficit Style: Background = Class Color, Bar = Black (Missing HP).
+        b.bg:SetVertexColor(r, g, bl, 0.9)
+        b.hp:SetStatusBarColor(0, 0, 0, 0.8)
+        b.hp:SetValue(maxhp - hp) -- Filling missing health with black
+    else
+        b.bg:SetVertexColor(0, 0, 0, 0.95)
+        b.hp:SetStatusBarColor(r, g, bl, 0.9)
+        b.hp:SetValue(hp)
+    end
 
     -- Role Icon
     if role == "TANK" then
@@ -479,6 +533,13 @@ function Frames:UpdateButton(b)
         b.roleIcon:Show()
     else
         b.roleIcon:Hide()
+    end
+
+    -- Threat Indicator
+    if threat >= 2 then
+        b.threatGlow:Show()
+    else
+        b.threatGlow:Hide()
     end
 
     -- THE FIX: Solid Color Overlay that scales perfectly
@@ -501,7 +562,20 @@ function Frames:UpdateButton(b)
         b.targetGlow:Hide()
     end
 
-    b.statusText:SetText(status or (pct .. "%"))
+    local stText = status
+    if not stText then
+        if hp < maxhp then
+            local diff = maxhp - hp
+            if diff >= 1000 then
+                stText = string.format("-%.1fk", diff / 1000)
+            else
+                stText = "-" .. diff
+            end
+        else
+            stText = pct .. "%"
+        end
+    end
+    b.statusText:SetText(stText)
     
     if b.mana:IsShown() then
         b.mana:SetMinMaxValues(0, maxmana or 1)

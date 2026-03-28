@@ -318,6 +318,34 @@ function UI:LoadStyle(c)
     mkCheck(c, "Heal Comm", "Show incoming heal predictions.", 
         function() return ns.DB.frame.showHealComm ~= false end, function(v) ns.DB.frame.showHealComm = v end):SetPoint("TOPLEFT", 15, y); y = y - 28
 
+    mkCheck(c, "Use Class Colors", "Use class colors for the health bars.", 
+        function() return ns.DB.frame.useClassColors end, function(v) ns.DB.frame.useClassColors = v end):SetPoint("TOPLEFT", 15, y); y = y - 28
+
+    mkCheck(c, "Inverted (Deficit)", "Show health deficit instead of full bar.", 
+        function() return ns.DB.frame.invertedColors end, function(v) ns.DB.frame.invertedColors = v end):SetPoint("TOPLEFT", 15, y); y = y - 35
+
+    local textures = {
+        { name = "Classic", path = "Interface\\TargetingFrame\\UI-StatusBar" },
+        { name = "Smooth", path = "Interface\\RaidFrame\\Shield-Fill" },
+        { name = "Glossy", path = "Interface\\PaperDollInfoFrame\\UI-Character-Skills-Bar" },
+        { name = "Minimalist", path = "Interface\\Buttons\\WHITE8X8" },
+    }
+
+    local texLabel = c:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    texLabel:SetPoint("TOPLEFT", 15, y - 5); texLabel:SetText("Texture:")
+    
+    for i, t in ipairs(textures) do
+        local btn = CreateFrame("Button", nil, c, "UIPanelButtonTemplate")
+        btn:SetSize(75, 20)
+        btn:SetPoint("TOPLEFT", 70 + (i-1)*80, y)
+        btn:SetText(t.name)
+        btn:SetScript("OnClick", function()
+            ns.DB.frame.barTexture = t.path
+            if ns.Frames then ns.Frames:ApplyLayout() end
+        end)
+    end
+    y = y - 35
+
     mkCheck(c, "Aura Timers", "Show cooldown timers on auras.", 
         function() return ns.DB.frame.showAuraTimers ~= false end, function(v) ns.DB.frame.showAuraTimers = v end):SetPoint("TOPLEFT", 15, y); y = y - 35
 
