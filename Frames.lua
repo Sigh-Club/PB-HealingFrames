@@ -374,8 +374,6 @@ function Frames:EnsureAnchors(activeGroups)
         return
     end
 
-    -- The master container (PB_HF_Anchor) must ALWAYS be shown if addon is enabled,
-    -- because it is the parent of all unit buttons.
     self.container:Show()
 
     if dbf.splitGroups then
@@ -383,18 +381,22 @@ function Frames:EnsureAnchors(activeGroups)
         self.container.bg:Hide()
         self.container.label:Hide()
         
+        -- If Unlocked: Show all 8 anchors
+        -- If Locked: Only show anchors for groups that have players
+        local isUnlocked = not ns.DB.locked
+        
         for i = 1, 8 do
             if not self.anchors[i] then
                 self.anchors[i] = self:CreateAnchor(i)
             end
             
-            local isNeeded = activeGroups and activeGroups[i]
-            local showAll = not ns.DB.locked
-            
-            if showAll or isNeeded then
+            local hasPlayers = activeGroups and activeGroups[i]
+            if isUnlocked or hasPlayers then
                 self.anchors[i]:Show()
-                -- Visuals (label/bg) only show if unlocked OR if we explicitly want them while locked (user's request)
-                if showAll or isNeeded then
+                -- Visuals (G1-G8 labels and dark background) only show when UNLOCKED
+                -- When locked, the anchor itself is visible (so buttons can be attached) 
+                -- but we hide the label/background to keep UI clean.
+                if isUnlocked then
                     self.anchors[i].bg:Show()
                     self.anchors[i].label:Show()
                 else
@@ -406,10 +408,10 @@ function Frames:EnsureAnchors(activeGroups)
             end
         end
     else
-        -- Combined mode
-        local showMaster = not ns.DB.locked
-        self.container.bg:SetShown(showMaster)
-        self.container.label:SetShown(showMaster)
+        -- Combined mode: Only show master anchor visuals if UNLOCKED
+        local isUnlocked = not ns.DB.locked
+        self.container.bg:SetShown(isUnlocked)
+        self.container.label:SetShown(isUnlocked)
         
         for i = 1, 8 do
             if self.anchors[i] then self.anchors[i]:Hide() end

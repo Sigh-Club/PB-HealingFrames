@@ -113,30 +113,24 @@ function UI:CreateMainWindow()
     frame:SetBackdropColor(0, 0, 0, 0)
     
     -- Centered wallpaper with correct 2:1 aspect ratio
+    -- Use MTCIcon.tga as the full-size background
     local wallpaper = frame:CreateTexture(nil, "BACKGROUND", nil, -8)
     wallpaper:SetPoint("CENTER", 0, 0)
-    wallpaper:SetSize(750, 375) -- 2:1 ratio for 1024x512
-    wallpaper:SetTexture("Interface\\AddOns\\PB_HealingFrames\\MTCWallpaper.tga")
-    wallpaper:SetTexCoord(0, 1, 1, 0) -- Vertical Flip fix
-    wallpaper:SetAlpha(1.0)
+    wallpaper:SetSize(512, 512) -- Large centered logo
+    wallpaper:SetTexture("Interface\\AddOns\\PB_HealingFrames\\Media\\MTCIcon.tga")
+    wallpaper:SetAlpha(0.25) -- Subtle background logo
     
     local tint = frame:CreateTexture(nil, "BACKGROUND", nil, -7)
     tint:SetAllPoints()
-    tint:SetTexture(0, 0, 0, 0.65)
+    tint:SetTexture(0, 0, 0, 0.7)
     
     frame:Hide()
 
-    -- Larger Header Icon
-    local icon = frame:CreateTexture(nil, "OVERLAY")
-    icon:SetSize(64, 64)
-    icon:SetPoint("TOPLEFT", 15, -5)
-    icon:SetTexture("Interface\\AddOns\\PB_HealingFrames\\Media\\MTCIcon.tga")
-
-    -- Larger, centered Header Title
+    -- Removed Header Icon, keeping only Title
     local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetFont("Fonts\\FRIZQT__.TTF", 18, "OUTLINE")
-    title:SetPoint("LEFT", icon, "RIGHT", 15, 0)
-    title:SetText("PB: Healing Frames V 1.2.1 beta")
+    title:SetPoint("TOPLEFT", 20, -15)
+    title:SetText("PB: Healing Frames V 1.2.2 beta")
 
     local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", -5, -5)
