@@ -78,6 +78,12 @@ local function EnsureSaved()
     
     local f = ns.DB.frame
     f.layoutStyle = f.layoutStyle or "bars"
+    f.dispelColors = f.dispelColors or {
+        Magic = { 0.20, 0.60, 1.00 },
+        Curse = { 0.60, 0.00, 1.00 },
+        Disease = { 0.60, 0.40, 0.00 },
+        Poison = { 0.00, 0.75, 0.20 },
+    }
     f.bars = f.bars or { width = 160, height = 20, spacing = 3, scale = 1, groupsPerRow = 4, groupSpacing = 12, nameLength = 10, shortenNames = true }
     f.grid = f.grid or { size = 40, columns = 5, spacing = 2, scale = 1, nameLength = 6, shortenNames = true }
     f.outOfRangeAlpha = f.outOfRangeAlpha or 0.35

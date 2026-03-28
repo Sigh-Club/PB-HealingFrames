@@ -303,15 +303,6 @@ local function CreateButton(i)
     b.auraIndicators.center.icon:SetTexCoord(0, 1, 0, 1) -- Fuller icon for center
     b.auraIndicators.center:SetFrameLevel(inter:GetFrameLevel() + 5)
 
-    b:SetScript("OnEnter", function(self)
-        if self.unit and UnitExists(self.unit) then
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:SetUnit(self.unit)
-            GameTooltip:Show()
-        end
-    end)
-    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
     return b
 end
 
@@ -381,6 +372,11 @@ function Frames:ApplyLayout()
             b.border:Show()
             b.shine:Show()
         end
+
+        local nfs = dbf.nameFontSize or 10
+        local sfs = dbf.statusFontSize or 8
+        b.nameText:SetFont("Fonts\\FRIZQT__.TTF", nfs, "OUTLINE")
+        b.statusText:SetFont("Fonts\\FRIZQT__.TTF", sfs, "OUTLINE")
 
         local mh = (dbf.showManaBar and (dbf.manaBarHeight or 3) or 0)
         if mh > 0 then
@@ -474,7 +470,6 @@ function Frames:UpdateButton(b)
         local cc = classColors[fake.classToken or "PRIEST"]
         b.nameText:SetTextColor(cc.r, cc.g, cc.b)
         threat = (b.index % 7 == 0) and 3 or 0
-        b.nameText:SetText(name) -- Bypass ShortenName for fake units to see texture names
     else
         if not unit or not UnitExists(unit) then return end
         name, hp, maxhp = UnitName(unit), UnitHealth(unit), UnitHealthMax(unit)
@@ -495,9 +490,9 @@ function Frames:UpdateButton(b)
 
         if UnitIsDeadOrGhost(unit) then status = "DEAD"
         elseif not UnitIsConnected(unit) then status = "OFFLINE" end
-        
-        b.nameText:SetText(ShortenName(name))
     end
+
+    b.nameText:SetText(ShortenName(name))
 
     b.hp:SetMinMaxValues(0, maxhp)
     b.hp:SetValue(hp)
@@ -513,14 +508,9 @@ function Frames:UpdateButton(b)
         r, g, bl = cc.r, cc.g, cc.b
     end
 
-    if fake and fake.texturePath then
-        b.hp:SetStatusBarTexture(fake.texturePath)
-        b.incHeal:SetStatusBarTexture(fake.texturePath)
-    else
-        local tex = dbf.barTexture or STATUS_BAR_TEX
-        b.hp:SetStatusBarTexture(tex)
-        b.incHeal:SetStatusBarTexture(tex)
-    end
+    local tex = dbf.barTexture or STATUS_BAR_TEX
+    b.hp:SetStatusBarTexture(tex)
+    b.incHeal:SetStatusBarTexture(tex)
 
     if dbf.invertedColors then
         b.bg:SetVertexColor(r, g, bl, 0.9)
@@ -542,7 +532,7 @@ function Frames:UpdateButton(b)
     end
 
     -- Threat Indicator
-    if threat >= 2 then
+    if threat >= 2 and dbf.showAggroBorder ~= false then
         b.threatGlow:Show()
     else
         b.threatGlow:Hide()
@@ -560,7 +550,7 @@ function Frames:UpdateButton(b)
         b.glow:Hide()
     end
 
-    if not fake and unit and UnitIsUnit(unit, "target") then
+    if not fake and unit and UnitIsUnit(unit, "target") and dbf.showTargetGlow ~= false then
         b.targetGlow:Show()
     else
         b.targetGlow:Hide()
@@ -568,7 +558,7 @@ function Frames:UpdateButton(b)
 
     local stText = status
     if not stText then
-        if hp < maxhp then
+        if hp < maxhp and dbf.showDeficit ~= false then
             local diff = maxhp - hp
             if diff >= 1000 then
                 stText = string.format("-%.1fk", diff / 1000)

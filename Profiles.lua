@@ -54,6 +54,11 @@ local function defaults()
             },
             barTexture = "Interface\\TargetingFrame\\UI-StatusBar",
             invertedColors = false,
+            showAggroBorder = true,
+            showTargetGlow = true,
+            showDeficit = true,
+            nameFontSize = 10,
+            statusFontSize = 8,
         },
         scan = {
             excludeGeneral = true,

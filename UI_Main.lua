@@ -295,7 +295,15 @@ function UI:LoadStyle(c)
 
     mkColorButton(c, "Healthy", function() return ns.DB.frame.healthyColor or {0.15, 0.78, 0.22} end, function(v) ns.DB.frame.healthyColor = v end):SetPoint("TOPLEFT", 15, y)
     mkColorButton(c, "Injured", function() return ns.DB.frame.injuredColor or {0.95, 0.82, 0.20} end, function(v) ns.DB.frame.injuredColor = v end):SetPoint("TOPLEFT", 115, y)
-    mkColorButton(c, "Critical", function() return ns.DB.frame.criticalColor or {0.95, 0.15, 0.15} end, function(v) ns.DB.frame.criticalColor = v end):SetPoint("TOPLEFT", 215, y); y = y - 35
+    mkColorButton(c, "Critical", function() return ns.DB.frame.criticalColor or {0.95, 0.15, 0.15} end, function(v) ns.DB.frame.criticalColor = v end):SetPoint("TOPLEFT", 215, y); y = y - 30
+
+    local th1b = c:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    th1b:SetPoint("TOPLEFT", 15, y); th1b:SetText("--- Dispel Colors ---"); y = y - 25
+
+    mkColorButton(c, "Magic", function() return ns.DB.frame.dispelColors.Magic or {0.2, 0.6, 1} end, function(v) ns.DB.frame.dispelColors.Magic = v end):SetPoint("TOPLEFT", 15, y)
+    mkColorButton(c, "Curse", function() return ns.DB.frame.dispelColors.Curse or {0.6, 0, 1} end, function(v) ns.DB.frame.dispelColors.Curse = v end):SetPoint("TOPLEFT", 115, y)
+    mkColorButton(c, "Poison", function() return ns.DB.frame.dispelColors.Poison or {0, 0.6, 0} end, function(v) ns.DB.frame.dispelColors.Poison = v end):SetPoint("TOPLEFT", 215, y)
+    mkColorButton(c, "Disease", function() return ns.DB.frame.dispelColors.Disease or {0.6, 0.4, 0} end, function(v) ns.DB.frame.dispelColors.Disease = v end):SetPoint("TOPLEFT", 315, y); y = y - 35
 
     local th2 = c:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     th2:SetPoint("TOPLEFT", 15, y); th2:SetText("--- Display Options ---"); y = y - 25
@@ -320,6 +328,15 @@ function UI:LoadStyle(c)
 
     mkCheck(c, "Use Class Colors", "Use class colors for the health bars.", 
         function() return ns.DB.frame.useClassColors end, function(v) ns.DB.frame.useClassColors = v end):SetPoint("TOPLEFT", 15, y); y = y - 28
+
+    mkCheck(c, "Aggro Border", "Show red border when unit has aggro.", 
+        function() return ns.DB.frame.showAggroBorder ~= false end, function(v) ns.DB.frame.showAggroBorder = v end):SetPoint("TOPLEFT", 15, y); y = y - 28
+
+    mkCheck(c, "Target Glow", "Show white border on current target.", 
+        function() return ns.DB.frame.showTargetGlow ~= false end, function(v) ns.DB.frame.showTargetGlow = v end):SetPoint("TOPLEFT", 15, y); y = y - 28
+
+    mkCheck(c, "Show Deficit", "Show -HP instead of % when injured.", 
+        function() return ns.DB.frame.showDeficit ~= false end, function(v) ns.DB.frame.showDeficit = v end):SetPoint("TOPLEFT", 15, y); y = y - 28
 
     mkCheck(c, "Inverted (Deficit)", "Show health deficit instead of full bar.", 
         function() return ns.DB.frame.invertedColors end, function(v) ns.DB.frame.invertedColors = v end):SetPoint("TOPLEFT", 15, y); y = y - 35
@@ -355,7 +372,13 @@ function UI:LoadStyle(c)
     mkCheck(c, "Shorten Names", "Truncate long names.", 
         function() return ns.DB.frame.bars.shortenNames end, function(v) ns.DB.frame.bars.shortenNames = v end):SetPoint("TOPLEFT", 15, y); y = y - 28
     mkCheck(c, "Shorten Grid Names", "Truncate long names in grid.", 
-        function() return ns.DB.frame.grid.shortenNames end, function(v) ns.DB.frame.grid.shortenNames = v end):SetPoint("TOPLEFT", 15, y); y = y - 35
+        function() return ns.DB.frame.grid.shortenNames end, function(v) ns.DB.frame.grid.shortenNames = v end):SetPoint("TOPLEFT", 15, y); y = y - 40
+
+    c.nameFS = mkSlider(c, "Name Font Size", 6, 20, 1, function() return ns.DB.frame.nameFontSize or 10 end, function(v) ns.DB.frame.nameFontSize = v end)
+    c.nameFS:SetPoint("TOPLEFT", 15, y); y = y - 40
+
+    c.statusFS = mkSlider(c, "Status Font Size", 6, 20, 1, function() return ns.DB.frame.statusFontSize or 8 end, function(v) ns.DB.frame.statusFontSize = v end)
+    c.statusFS:SetPoint("TOPLEFT", 15, y); y = y - 40
 
     c.manaH = mkSlider(c, "Mana Height", 0, 8, 1, function() return ns.DB.frame.manaBarHeight or 3 end, function(v) ns.DB.frame.manaBarHeight = v end)
     c.manaH:SetPoint("TOPLEFT", 15, y)
