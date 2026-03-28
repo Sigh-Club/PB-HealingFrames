@@ -6,10 +6,9 @@ local positionMap = {}
 
 local function collectActiveAuras(unit)
     local active = {}
-    if not unit then return active end
+    if not unit or not UnitExists(unit) then return active end
     
-    -- Track both Helpful (Buffs) and Harmful (Debuffs)
-    -- Helpful
+    -- Scan Helpful (Buffs)
     for i = 1, 40 do
         local name, _, icon, count, _, duration, expirationTime, caster = UnitAura(unit, i, "HELPFUL")
         if not name then break end
@@ -17,22 +16,21 @@ local function collectActiveAuras(unit)
         local lname = string.lower(name)
         local pos = positionMap[lname]
         
-        -- Special case: Beacon of Light should be tracked even if not cast by us? 
-        -- Usually healers want to see THEIR beacon.
         if pos and not active[pos] then
-            if caster == "player" or caster == "pet" or lname == "beacon of light" then
+            -- We track it if it's from us, or if it's high priority like Beacon/Earth Shield
+            local isMine = caster and (UnitIsUnit(caster, "player") or UnitIsUnit(caster, "pet"))
+            if isMine or lname == "beacon of light" or lname == "earth shield" then
                 active[pos] = { icon = icon, count = count, duration = duration, expires = expirationTime }
             end
         end
     end
     
-    -- Harmful (Debuffs for center icon)
+    -- Scan Harmful (Debuffs for center icon)
     for i = 1, 40 do
         local name, _, icon, count, _, duration, expirationTime = UnitAura(unit, i, "HARMFUL")
         if not name then break end
         
         local lname = string.lower(name)
-        -- If we have specifically tracked debuffs for the center
         if positionMap[lname] == "center" and not active.center then
             active.center = { icon = icon, count = count, duration = duration, expires = expirationTime }
         end
@@ -76,14 +74,13 @@ function Auras:UpdateButtonAuras(btn, cached)
             active.bottomright = { icon = "Interface\\Icons\\Spell_Nature_HealingWave", count = 0, duration = dur, expires = expires }
         end
         
-        -- Add a fake center debuff for demonstration in test mode
         if (group == 5) then
             active.center = { icon = "Interface\\Icons\\Spell_Shadow_ShadowWordPain", count = 0, duration = 30, expires = t + 15 }
         end
     elseif btn.unit then
         active = active or collectActiveAuras(btn.unit)
         
-        -- If no center aura is set by collectActiveAuras, check if we have a curable debuff to show there
+        -- Center icon fallback: show current curable debuff if no center aura tracked
         if not active.center and btn.curableDebuff then
             local d = btn.curableDebuff
             active.center = { icon = d.texture, count = d.count or 0, duration = d.duration or 0, expires = d.expires or 0 }
@@ -96,7 +93,7 @@ function Auras:UpdateButtonAuras(btn, cached)
             ind.icon:SetTexture(data.icon)
             ind.countText:SetText((data.count and data.count > 1) and data.count or "")
             
-            if data.duration and data.duration > 0 and data.expires then
+            if data.duration and data.duration > 0 and data.expires and data.expires > 0 then
                 ind.cd:SetCooldown(data.expires - data.duration, data.duration)
                 ind.cd:Show()
                 

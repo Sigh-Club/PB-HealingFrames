@@ -116,7 +116,7 @@ function UI:CreateMainWindow()
     local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetFont("Fonts\\FRIZQT__.TTF", 20, "OUTLINE")
     title:SetPoint("TOP", 0, -15)
-    title:SetText("PB: Healing Frames V 1.3.1 beta")
+    title:SetText("PB: Healing Frames V 1.3.3 beta")
 
     local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", -5, -5)
@@ -213,7 +213,7 @@ function UI:LoadGeneral(c)
 
     local scan = CreateFrame("Button", nil, c, "UIPanelButtonTemplate")
     scan:SetSize(160, 28); scan:SetPoint("TOPLEFT", 15, y); scan:SetText("Scan Spells")
-    scan:SetScript("OnClick", function() ns.SpellBook:Scan() end); y = y - 40
+    scan:SetScript("OnClick", function() ns.SpellBook:Scan(true) end); y = y - 40
     
     local test = mkCheck(c, "Test Mode", "Show fake frames for setup.", 
         function() return ns.DB.frame.fakeMode end, 
@@ -334,7 +334,7 @@ function UI:LoadStyle(c)
     y = y - 45
 
     local th1 = c:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    th1:SetPoint("TOPLEFT", 15, y); th1:SetText("--- Health Colors ---"); y = y - 40
+    th1:SetPoint("TOPLEFT", 15, y); th1:SetText("--- Health Colors ---"); y = y - 35
 
     mkColorButton(c, "Healthy", function() return ns.DB.frame.healthyColor or {0.15, 0.78, 0.22} end, function(v) ns.DB.frame.healthyColor = v end):SetPoint("TOPLEFT", 15, y)
     mkColorButton(c, "Injured", function() return ns.DB.frame.injuredColor or {0.95, 0.82, 0.20} end, function(v) ns.DB.frame.injuredColor = v end):SetPoint("TOPLEFT", 145, y)
@@ -384,7 +384,7 @@ function UI:LoadStyle(c)
     mkCheck(c, "Inverted (Deficit)", "Show health deficit instead of full bar.", 
         function() return ns.DB.frame.invertedColors end, function(v) ns.DB.frame.invertedColors = v end):SetPoint("TOPLEFT", 15, y); y = y - 32
 
-    mkColorButton(c, "Hover Color", function() return ns.DB.frame.hoverColor or {1, 1, 1, 0.15} end, function(v) ns.DB.frame.hoverColor = v end):SetPoint("TOPLEFT", 15, y); y = y - 40
+    mkColorButton(c, "Hover Color", function() return ns.DB.frame.hoverColor or {1, 1, 1, 0.15} end, function(v) ns.DB.frame.hoverColor = v end):SetPoint("TOPLEFT", 15, y); y = y - 45
 
     local textures = {
         { name = "Classic", path = "Interface\\TargetingFrame\\UI-StatusBar" },
@@ -453,7 +453,7 @@ local function CreateSpellPicker()
     f.currentCategoryIdx = 1
     
     local catBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-    catBtn:SetSize(120, 24)
+    catBtn:SetSize(140, 26)
     catBtn:SetPoint("TOPLEFT", 20, -50)
     catBtn:SetText("Filter: All")
     catBtn:SetScript("OnClick", function()
@@ -494,6 +494,7 @@ local function CreateSpellPicker()
     targetBtn:SetSize(80, 24); targetBtn:SetPoint("RIGHT", closeBtn, "LEFT", -10, 0); targetBtn:SetText("Target")
     targetBtn:SetScript("OnClick", function()
         ns.Bindings:SetTarget(f.currentSlot)
+        if ns.UI_Main then ns.UI_Main:RefreshKeybinds() end
         f:Hide()
     end)
     
@@ -501,6 +502,7 @@ local function CreateSpellPicker()
     menuBtn:SetSize(70, 24); menuBtn:SetPoint("RIGHT", targetBtn, "LEFT", -10, 0); menuBtn:SetText("Menu")
     menuBtn:SetScript("OnClick", function()
         ns.Bindings:SetMenu(f.currentSlot)
+        if ns.UI_Main then ns.UI_Main:RefreshKeybinds() end
         f:Hide()
     end)
     
@@ -541,17 +543,17 @@ local function CreateSpellPicker()
                 local btn = self.buttons[count]
                 if not btn then
                     btn = CreateFrame("Button", nil, self.scrollChild)
-                    btn:SetSize(370, 28)
+                    btn:SetSize(370, 30)
                     
                     local bg = btn:CreateTexture(nil, "BACKGROUND")
-                    bg:SetAllPoints(); bg:SetTexture(0.15, 0.15, 0.15, 0.8)
+                    bg:SetAllPoints(); bg:SetTexture(0, 0, 0, 0.5)
                     btn.bg = bg
                     
                     local highlight = btn:CreateTexture(nil, "HIGHLIGHT")
                     highlight:SetAllPoints(); highlight:SetTexture(1, 1, 1, 0.1)
                     
                     local icon = btn:CreateTexture(nil, "OVERLAY")
-                    icon:SetSize(22, 22); icon:SetPoint("LEFT", 5, 0)
+                    icon:SetSize(24, 24); icon:SetPoint("LEFT", 5, 0)
                     btn.icon = icon
                     
                     local text = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
@@ -561,6 +563,7 @@ local function CreateSpellPicker()
                     
                     btn:SetScript("OnClick", function()
                         ns.Bindings:SetSpell(self.currentSlot, spell.name)
+                        if ns.UI_Main then ns.UI_Main:RefreshKeybinds() end
                         self:Hide()
                     end)
                     self.buttons[count] = btn
@@ -569,7 +572,7 @@ local function CreateSpellPicker()
                 btn:SetText(spell.name)
                 btn.icon:SetTexture(spell.texture)
                 btn:Show()
-                y = y + 30
+                y = y + 32
             end
         end
         self.scrollChild:SetHeight(math.max(y, 100))
@@ -605,7 +608,7 @@ local function CreateBindCapture()
     local blocker = CreateFrame("Frame", nil, f)
     blocker:SetAllPoints(UIParent)
     blocker:SetFrameStrata("TOOLTIP")
-    blocker:SetFrameLevel(f:GetFrameLevel() + 10) -- Ensure blocker is on TOP of everything
+    blocker:SetFrameLevel(f:GetFrameLevel() + 10)
     blocker:EnableMouse(true)
     blocker:EnableMouseWheel(true)
     blocker:EnableKeyboard(true)
@@ -660,7 +663,7 @@ function UI:LoadKeybinds(c)
     captureAnchor:SetSize(350, 60); captureAnchor:SetPoint("TOPLEFT", 15, y - 30)
     c.captureAnchor = captureAnchor
 
-    y = y - 90 -- Push buttons down further to make room for capture UI
+    y = y - 90
 
     local tip = c:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     tip:SetPoint("TOPLEFT", 15, y); tip:SetText("Click + to assign a spell, X to clear, or use Auto Bind")
@@ -708,7 +711,6 @@ function UI:RefreshKeybinds()
     local slots = ns.Bindings:GetOrderedSlots()
     if not content.keyRows then content.keyRows = {} end
 
-    -- Hide all existing rows first
     for _, row in ipairs(content.keyRows) do row:Hide() end
 
     for i, slot in ipairs(slots) do

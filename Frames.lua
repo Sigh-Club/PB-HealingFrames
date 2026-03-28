@@ -43,7 +43,10 @@ local function IsUnitInHealRange(unit)
     if not unit or not UnitExists(unit) then return false end
     if UnitIsUnit(unit, "player") or UnitIsUnit(unit, "pet") then return true end
     if UnitIsDeadOrGhost(unit) then return true end
-    local spell = ns.SpellBook and ns.SpellBook:GetRangeSpellName()
+    local spell
+    if ns.SpellBook and ns.SpellBook.GetRangeSpellName then
+        spell = ns.SpellBook:GetRangeSpellName()
+    end
     if spell then
         local r = ns.Compat:IsSpellInRange(spell, unit)
         if r == 1 then return true end
@@ -625,6 +628,8 @@ function Frames:UpdateButton(b)
 
         if UnitIsDeadOrGhost(unit) then status = "DEAD"
         elseif not UnitIsConnected(unit) then status = "OFFLINE" end
+        
+        b.curableDebuff = debuff -- Store for Auras module to use
     end
 
     b.nameText:SetText(ShortenName(name))
