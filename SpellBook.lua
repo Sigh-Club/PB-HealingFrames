@@ -127,7 +127,12 @@ function SpellBook:GetRangeSpellName()
     return self.rangeSpellName
 end
 
+local lastScan = 0
 function SpellBook:Scan()
+    local now = GetTime()
+    if now - lastScan < 2 then return end -- Debounce 2 seconds
+    lastScan = now
+    
     wipe(self.raw)
     wipe(self.bindable)
     wipe(self.byName)
