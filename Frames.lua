@@ -704,6 +704,28 @@ function Frames:UpdateRange(b)
     b:SetAlpha(inRange and 1 or (ns.DB.frame.outOfRangeAlpha or 0.35))
 end
 
+function Frames:ResetAnchorPositions()
+    local dbf = ns.DB.frame
+    dbf.x = nil
+    dbf.y = nil
+    dbf.groupPositions = {}
+    
+    if self.container then
+        self.container:ClearAllPoints()
+        self.container:SetPoint("CENTER")
+    end
+    
+    for i = 1, 8 do
+        if self.anchors[i] then
+            self.anchors[i]:ClearAllPoints()
+            self.anchors[i]:SetPoint("CENTER", -200 + (i-1)*60, 100)
+        end
+    end
+    
+    self:ApplyLayout()
+    ns:Print("Anchor positions reset to default.")
+end
+
 function Frames:OnInitialize() self:EnsureAnchors() end
 function Frames:OnEnable() self:ApplyLayout() end
 function Frames:OnEvent(event, unit) 

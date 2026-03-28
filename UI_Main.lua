@@ -35,9 +35,11 @@ local function mkSlider(parent, label, minv, maxv, step, getter, setter)
 
     s:SetScript("OnValueChanged", function(self, value)
         value = math.floor((value / step) + 0.5) * step
-        setter(value)
-        self.text:SetText(label .. ": " .. tostring(value))
-        if ns.Frames and ns.Frames.ApplyLayout then ns.Frames:ApplyLayout() end
+        if value ~= getter() then
+            setter(value)
+            self.text:SetText(label .. ": " .. tostring(value))
+            if ns.Frames and ns.Frames.ApplyLayout then ns.Frames:ApplyLayout() end
+        end
     end)
     
     s:SetValue(getter())
@@ -107,28 +109,23 @@ function UI:CreateMainWindow()
     frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
     frame:SetFrameStrata("DIALOG")
     CreateFrameBackdrop(frame)
-    frame:SetBackdropColor(0, 0, 0, 0) -- Make backdrop transparent to show wallpaper
+    frame:SetBackdropColor(0, 0, 0, 0)
     
     local wallpaper = frame:CreateTexture(nil, "BACKGROUND", nil, -8)
-    wallpaper:SetAllPoints()
+    wallpaper:SetPoint("CENTER", 0, 0)
+    wallpaper:SetSize(580, 420)
     wallpaper:SetTexture("Interface\\AddOns\\PB_HealingFrames\\MTCWallpaper.tga")
-    wallpaper:SetTexCoord(0, 1, 1, 0) -- Flip vertically to fix upside down issue
-    wallpaper:SetAlpha(1.0) -- Full opacity since it's the background now
+    wallpaper:SetTexCoord(0, 1, 1, 0) -- Vertical Flip
+    wallpaper:SetAlpha(1.0)
     
-    -- Optional: add a dark tint over the wallpaper to keep text readable
     local tint = frame:CreateTexture(nil, "BACKGROUND", nil, -7)
     tint:SetAllPoints()
     tint:SetTexture(0, 0, 0, 0.6)
     
     frame:Hide()
 
-    local icon = frame:CreateTexture(nil, "OVERLAY")
-    icon:SetSize(48, 48) -- Increased size to prevent squished look
-    icon:SetPoint("TOPLEFT", 10, -5)
-    icon:SetTexture("Interface\\AddOns\\PB_HealingFrames\\Media\\MekTownChoppaz.tga")
-
     local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("LEFT", icon, "RIGHT", 10, 0)
+    title:SetPoint("TOP", 0, -12)
     title:SetText("PB: Healing Frames V 1.2 beta")
 
     local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
@@ -137,6 +134,13 @@ function UI:CreateMainWindow()
     local sidebar = CreateFrame("Frame", nil, frame)
     sidebar:SetSize(120, 380); sidebar:SetPoint("TOPLEFT", 10, -40)
     CreateFrameBackdrop(sidebar); sidebar:SetBackdropColor(0.1, 0.1, 0.1, 0.5)
+
+    -- Icon at bottom of sidebar
+    local sideIcon = sidebar:CreateTexture(nil, "BACKGROUND")
+    sideIcon:SetSize(110, 110)
+    sideIcon:SetPoint("BOTTOM", sidebar, "BOTTOM", 0, 5)
+    sideIcon:SetTexture("Interface\\AddOns\\PB_HealingFrames\\Media\\MekTownChoppaz.tga")
+    sideIcon:SetAlpha(0.8)
 
     local content = CreateFrame("Frame", nil, frame)
     content:SetSize(430, 380); content:SetPoint("TOPLEFT", sidebar, "TOPRIGHT", 10, 0)
@@ -216,7 +220,14 @@ function UI:LoadGeneral(c)
         function(v) if ns.Roster then ns.Roster:SetFakeMode(v, ns.DB.frame.fakeSize or 10) end end)
     test:SetPoint("TOPLEFT", 15, y); y = y - 30
 
-    c.fakeSize = mkSlider(c, "Test Units", 5, 40, 1, function() return ns.DB.frame.fakeSize or 10 end, function(v) ns.DB.frame.fakeSize = v; if ns.Roster then ns.Roster:SetFakeMode(true, v) end end)
+    c.fakeSize = mkSlider(c, "Test Units", 5, 40, 1, 
+        function() return ns.DB.frame.fakeSize or 10 end, 
+        function(v) 
+            ns.DB.frame.fakeSize = v
+            if ns.DB.frame.fakeMode and ns.Roster then 
+                ns.Roster:SetFakeMode(true, v) 
+            end 
+        end)
     c.fakeSize:SetPoint("TOPLEFT", 15, y); y = y - 40
 
     local th1 = c:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -252,8 +263,14 @@ function UI:LoadLayout(c)
 
     local split = mkCheck(c, "Split Group Anchors", "Allow moving each raid group independently.", 
         function() return ns.DB.frame.splitGroups end, function(v) ns.DB.frame.splitGroups = v; if ns.Frames then ns.Frames:ApplyLayout() end end)
-    split:SetPoint("TOPLEFT", 15, y); y = y - 35
+    split:SetPoint("TOPLEFT", 15, y)
     c.splitCheck = split
+
+    local resetPos = CreateFrame("Button", nil, c, "UIPanelButtonTemplate")
+    resetPos:SetSize(120, 24); resetPos:SetPoint("LEFT", split, "RIGHT", 150, 0); resetPos:SetText("Reset Anchors")
+    resetPos:SetScript("OnClick", function() if ns.Frames and ns.Frames.ResetAnchorPositions then ns.Frames:ResetAnchorPositions() end end)
+
+    y = y - 35
 
     local barHeader = c:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     barHeader:SetPoint("TOPLEFT", 15, y); barHeader:SetText("--- Bar Mode Settings ---")
