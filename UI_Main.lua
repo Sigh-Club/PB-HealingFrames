@@ -46,16 +46,18 @@ local function mkSlider(parent, label, minv, maxv, step, getter, setter)
 end
 
 local function openColorPicker(current, callback)
-    local r, g, bl = current[1], current[2], current[3]
+    local r, g, bl, a = current[1], current[2], current[3], current[4] or 1
     ColorPickerFrame.func = function()
         local nr, ng, nb = ColorPickerFrame:GetColorRGB()
-        callback({nr, ng, nb})
+        local na = ColorPickerFrame.hasOpacity and (1 - OpacitySliderFrame:GetValue()) or 1
+        callback({nr, ng, nb, na})
     end
     ColorPickerFrame.cancelFunc = function(prev)
-        callback({prev.r, prev.g, prev.b})
+        callback({prev.r, prev.g, prev.b, prev.opacity and (1 - prev.opacity) or 1})
     end
-    ColorPickerFrame.hasOpacity = false
-    ColorPickerFrame.previousValues = { r = r, g = g, b = bl }
+    ColorPickerFrame.hasOpacity = (current[4] ~= nil)
+    ColorPickerFrame.opacity = 1 - a
+    ColorPickerFrame.previousValues = { r = r, g = g, b = bl, opacity = 1 - a }
     ColorPickerFrame:SetColorRGB(r, g, bl)
     ColorPickerFrame:Hide(); ColorPickerFrame:Show()
 end
@@ -68,14 +70,14 @@ local function mkColorButton(parent, label, getter, setter)
     
     local function updateSwatch()
         local c = getter()
-        btn.swatch:SetTexture(c[1], c[2], c[3], 1)
+        btn.swatch:SetTexture(c[1], c[2], c[3], c[4] or 1)
     end
     
     btn:SetScript("OnClick", function()
         openColorPicker(getter(), function(c) 
             setter(c)
             updateSwatch()
-            if ns.Frames and ns.Frames.ApplyLayout then ns.Frames.ApplyLayout() end
+            if ns.Frames and ns.Frames.ApplyLayout then ns.Frames:ApplyLayout() end
         end)
     end)
     updateSwatch()
@@ -109,7 +111,7 @@ function UI:CreateMainWindow()
 
     local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOPLEFT", 12, -12)
-    title:SetText("PB: Healing Frames V 1.0 beta")
+    title:SetText("PB: Healing Frames V 1.1 beta")
 
     local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", -2, -2)
@@ -228,7 +230,12 @@ function UI:LoadLayout(c)
     local mode = mkCheck(c, "Grid Mode (Squares)", "Switch to square grid layout.", 
         function() return ns.DB.frame.layoutStyle == "grid" end, 
         function(v) ns.DB.frame.layoutStyle = v and "grid" or "bars"; self:UpdateLayoutVisibility(c) end)
-    mode:SetPoint("TOPLEFT", 15, y); y = y - 35
+    mode:SetPoint("TOPLEFT", 15, y); y = y - 30
+
+    local split = mkCheck(c, "Split Group Anchors", "Allow moving each raid group independently.", 
+        function() return ns.DB.frame.splitGroups end, function(v) ns.DB.frame.splitGroups = v; if ns.Frames then ns.Frames:ApplyLayout() end end)
+    split:SetPoint("TOPLEFT", 15, y); y = y - 35
+    c.splitCheck = split
 
     local barHeader = c:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     barHeader:SetPoint("TOPLEFT", 15, y); barHeader:SetText("--- Bar Mode Settings ---")
@@ -275,6 +282,7 @@ end
 
 function UI:UpdateLayoutVisibility(c)
     local isGrid = ns.DB.frame.layoutStyle == "grid"
+    c.splitCheck:SetShown(not isGrid)
     c.barHeader:SetShown(not isGrid)
     c.bScale:SetShown(not isGrid); c.bWidth:SetShown(not isGrid); c.bHeight:SetShown(not isGrid)
     c.bSpacing:SetShown(not isGrid); c.bCols:SetShown(not isGrid); c.bGroupSp:SetShown(not isGrid)
@@ -339,7 +347,9 @@ function UI:LoadStyle(c)
         function() return ns.DB.frame.showDeficit ~= false end, function(v) ns.DB.frame.showDeficit = v end):SetPoint("TOPLEFT", 15, y); y = y - 28
 
     mkCheck(c, "Inverted (Deficit)", "Show health deficit instead of full bar.", 
-        function() return ns.DB.frame.invertedColors end, function(v) ns.DB.frame.invertedColors = v end):SetPoint("TOPLEFT", 15, y); y = y - 35
+        function() return ns.DB.frame.invertedColors end, function(v) ns.DB.frame.invertedColors = v end):SetPoint("TOPLEFT", 15, y); y = y - 28
+
+    mkColorButton(c, "Hover Color", function() return ns.DB.frame.hoverColor or {1, 1, 1, 0.15} end, function(v) ns.DB.frame.hoverColor = v end):SetPoint("TOPLEFT", 15, y); y = y - 35
 
     local textures = {
         { name = "Classic", path = "Interface\\TargetingFrame\\UI-StatusBar" },

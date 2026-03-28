@@ -3,6 +3,7 @@ local Frames = ns:RegisterModule("Frames", {})
 ns.Frames = Frames
 
 Frames.container = nil
+Frames.anchors = {}
 Frames.buttons = {}
 Frames.MAX = 40
 Frames.queue = {}
@@ -306,47 +307,81 @@ local function CreateButton(i)
     return b
 end
 
-function Frames:CreateAnchor()
-    if self.container then return end
-    local f = CreateFrame("Frame", "PB_HF_Anchor", UIParent)
-    f:SetSize(200, 100)
-    f:SetPoint("CENTER")
+function Frames:CreateAnchor(id)
+    local name = id and ("PB_HF_Anchor" .. id) or "PB_HF_Anchor"
+    local f = _G[name] or CreateFrame("Frame", name, UIParent)
+    f:SetSize(id and 100 or 200, id and 20 or 100)
+    
+    -- Load position
+    local dbf = ns.DB.frame
+    if id then
+        local pos = dbf.groupPositions[id]
+        if pos then
+            f:ClearAllPoints()
+            f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", pos.x, pos.y)
+        else
+            f:SetPoint("CENTER", -200 + (id-1)*60, 100)
+        end
+    else
+        f:SetPoint("CENTER")
+    end
+
     f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton")
     f:SetScript("OnDragStart", function(s) if not ns.DB.locked then s:StartMoving() end end)
     f:SetScript("OnDragStop", function(s) 
         s:StopMovingOrSizing()
         local _, _, _, x, y = s:GetPoint()
-        ns.DB.frame.x = x
-        ns.DB.frame.y = y
-    end)
-    local tex = f:CreateTexture(nil, "BACKGROUND")
-    tex:SetAllPoints(); tex:SetTexture(0,0,0,0.2)
-    f:Show()
-    self.container = f
-    
-    local ticker = 0
-    f:SetScript("OnUpdate", function(_, elap)
-        ticker = ticker + elap
-        if ticker > 0.1 then
-            ticker = 0
-            for _, b in ipairs(self.buttons) do 
-                if b:IsShown() then 
-                    self:UpdateRange(b) 
-                    if ns.DB.frame.fakeMode then self:UpdateButton(b) end
-                end 
-            end
+        if id then
+            dbf.groupPositions[id] = { x = x, y = y }
+        else
+            dbf.x = x
+            dbf.y = y
         end
     end)
+
+    local tex = f:CreateTexture(nil, "BACKGROUND")
+    tex:SetAllPoints(); tex:SetTexture(0,0,0,0.2)
+    
+    local lbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    lbl:SetPoint("CENTER"); lbl:SetText(id and ("G" .. id) or "PB:HF")
+    f.label = lbl
+
+    f:Show()
+    return f
+end
+
+function Frames:EnsureAnchors()
+    local dbf = ns.DB.frame
+    if not self.container then self.container = self:CreateAnchor() end
+    
+    if dbf.splitGroups then
+        self.container:Hide()
+        for i = 1, 8 do
+            if not self.anchors[i] then
+                self.anchors[i] = self:CreateAnchor(i)
+            end
+            self.anchors[i]:Show()
+        end
+    else
+        self.container:Show()
+        for i = 1, 8 do
+            if self.anchors[i] then self.anchors[i]:Hide() end
+        end
+    end
 end
 
 function Frames:ApplyLayout()
-    if not self.container then self:CreateAnchor() end
+    self:EnsureAnchors()
     local dbf = ns.DB.frame
     local isGrid = dbf.layoutStyle == "grid"
     local cfg = isGrid and dbf.grid or dbf.bars
     local tex = dbf.barTexture or STATUS_BAR_TEX
     
-    self.container:SetScale(cfg.scale or 1)
+    local scale = cfg.scale or 1
+    self.container:SetScale(scale)
+    for i = 1, 8 do
+        if self.anchors[i] then self.anchors[i]:SetScale(scale) end
+    end
 
     for i = 1, self.MAX do
         local b = self.buttons[i] or CreateButton(i)
@@ -413,6 +448,11 @@ function Frames:ApplyRoster()
                 local col = (i - 1) % cols
                 local row = math.floor((i - 1) / cols)
                 b:SetPoint("TOPLEFT", self.container, "TOPLEFT", 8 + col * (cfg.size + spacing), -8 - row * (cfg.size + spacing))
+            elseif dbf.splitGroups then
+                local group = entry.group or 1
+                countInGroup[group] = (countInGroup[group] or 0) + 1
+                local anchor = self.anchors[group] or self.container
+                b:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, - (countInGroup[group] - 1) * (cfg.height + spacing))
             else
                 local group = entry.group or 1
                 countInGroup[group] = (countInGroup[group] or 0) + 1
@@ -577,6 +617,10 @@ function Frames:UpdateButton(b)
         b.mana:SetStatusBarColor(0.2, 0.4, 1.0)
     end
 
+    -- Hover Highlight
+    local hc = dbf.hoverColor or {1, 1, 1, 0.1}
+    b.hover:SetVertexColor(hc[1], hc[2], hc[3], hc[4] or 0.1)
+
     self:UpdateRange(b)
     if ns.Auras then ns.Auras:UpdateButtonAuras(b) end
     if ns.HealComm then ns.HealComm:UpdateUnit(b) end
@@ -589,7 +633,7 @@ function Frames:UpdateRange(b)
     b:SetAlpha(inRange and 1 or (ns.DB.frame.outOfRangeAlpha or 0.35))
 end
 
-function Frames:OnInitialize() self:CreateAnchor() end
+function Frames:OnInitialize() self:EnsureAnchors() end
 function Frames:OnEnable() self:ApplyLayout() end
 function Frames:OnEvent(event, unit) 
     if event == "PLAYER_ENTERING_WORLD" or event == "PARTY_MEMBERS_CHANGED" or event == "RAID_ROSTER_UPDATE" then

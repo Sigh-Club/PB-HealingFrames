@@ -52,6 +52,7 @@ local function defaults()
                 Disease = { 0.60, 0.40, 0.00 },
                 Poison = { 0.00, 0.75, 0.20 },
             },
+            hoverColor = { 1.00, 1.00, 1.00, 0.15 },
             barTexture = "Interface\\TargetingFrame\\UI-StatusBar",
             invertedColors = false,
             showAggroBorder = true,
@@ -59,6 +60,8 @@ local function defaults()
             showDeficit = true,
             nameFontSize = 10,
             statusFontSize = 8,
+            splitGroups = false,
+            groupPositions = {}, -- [1..8] = {x, y}
         },
         scan = {
             excludeGeneral = true,
