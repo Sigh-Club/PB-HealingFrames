@@ -107,6 +107,12 @@ function UI:CreateMainWindow()
     frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
     frame:SetFrameStrata("DIALOG")
     CreateFrameBackdrop(frame)
+    
+    local wallpaper = frame:CreateTexture(nil, "BACKGROUND", nil, -7)
+    wallpaper:SetAllPoints()
+    wallpaper:SetTexture("Interface\\AddOns\\PB_HealingFrames\\MTCWallpaper.tga")
+    wallpaper:SetAlpha(0.4)
+    
     frame:Hide()
 
     local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
