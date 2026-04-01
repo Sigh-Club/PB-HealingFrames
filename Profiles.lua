@@ -38,6 +38,8 @@ local function defaults()
             showRaidIcons = true,
             raidIconSize = 16,
             nameFontSize = 10,
+            nameOffsetX = 0,
+            nameOffsetY = 0,
             statusFontSize = 8,
             splitGroups = false,
             groupPositions = {},

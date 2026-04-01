@@ -501,10 +501,16 @@ function UI:LoadStyle(c)
     mkCheck(c, "Shorten Grid Names", "Truncate long names in grid.", 
         function() return ns.DB.frame.grid.shortenNames end, function(v) ns.DB.frame.grid.shortenNames = v end):SetPoint("TOPLEFT", 15, y); y = y - 50
 
-    c.nameFS = mkSlider(c, "Name Font Size", 6, 28, 1, function() return ns.DB.frame.nameFontSize or 10 end, function(v) ns.DB.frame.nameFontSize = v end)
+    c.nameFS = mkSlider(c, "Name Font Size", 6, 28, 1, function() return ns.DB.frame.nameFontSize or 10 end, function(v) ns.DB.frame.nameFontSize = v; if ns.Frames then ns.Frames:ApplyLayout() end end)
     c.nameFS:SetPoint("TOPLEFT", 15, y); y = y - 55
 
-    c.statusFS = mkSlider(c, "Status Font Size", 6, 28, 1, function() return ns.DB.frame.statusFontSize or 8 end, function(v) ns.DB.frame.statusFontSize = v end)
+    c.nameX = mkSlider(c, "Name X Offset", -100, 100, 1, function() return ns.DB.frame.nameOffsetX or 0 end, function(v) ns.DB.frame.nameOffsetX = v; if ns.Frames then ns.Frames:ApplyLayout() end end)
+    c.nameX:SetPoint("TOPLEFT", 15, y); c.nameX:SetWidth(180)
+
+    c.nameY = mkSlider(c, "Name Y Offset", -50, 50, 1, function() return ns.DB.frame.nameOffsetY or 0 end, function(v) ns.DB.frame.nameOffsetY = v; if ns.Frames then ns.Frames:ApplyLayout() end end)
+    c.nameY:SetPoint("TOPLEFT", 280, y); c.nameY:SetWidth(180); y = y - 55
+
+    c.statusFS = mkSlider(c, "Status Font Size", 6, 28, 1, function() return ns.DB.frame.statusFontSize or 8 end, function(v) ns.DB.frame.statusFontSize = v; if ns.Frames then ns.Frames:ApplyLayout() end end)
     c.statusFS:SetPoint("TOPLEFT", 15, y); y = y - 55
 
     c.manaH = mkSlider(c, "Mana Height", 0, 16, 1, function() return ns.DB.frame.manaBarHeight or 3 end, function(v) ns.DB.frame.manaBarHeight = v end)
