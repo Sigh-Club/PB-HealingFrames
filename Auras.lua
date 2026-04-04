@@ -449,13 +449,16 @@ function Auras:UpdateButtonAuras(btn, cached)
                     ind:SetScript("OnUpdate", function(selfIndicator, _)
                         if not ns.DB.frame.showAuraTimers then
                             selfIndicator.timerText:SetText("")
+                            selfIndicator.timerText:Hide()
                             return
                         end
                         local remain = data.expires - GetTime()
                         if remain <= 0 then
                             selfIndicator.timerText:SetText("")
+                            selfIndicator.timerText:Hide()
                             selfIndicator:SetScript("OnUpdate", nil)
                         else
+                            selfIndicator.timerText:Show()
                             if remain < 2.5 then
                                 selfIndicator.timerText:SetTextColor(1, 0.1, 0.1)
                             elseif remain < 5 then

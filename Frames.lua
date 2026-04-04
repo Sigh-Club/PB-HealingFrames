@@ -189,6 +189,12 @@ local function CreateHotIndicatorBox(parent, point, x, y)
     count:SetTextColor(1, 1, 1)
     f.countText = count
 
+    local timer = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    timer:SetPoint("CENTER", 0, 0)
+    timer:SetFont("Fonts\\FRIZQT__.TTF", 8, "OUTLINE")
+    timer:Hide()
+    f.timerText = timer
+
     f:Hide()
     return f
 end
