@@ -222,36 +222,7 @@ collectActiveAuras = function(unit)
         end
     end
 
-    -- Add Ghost Indicators for missing maintenance auras
-    if ns.BuildState and ns.BuildState.GetMaintenanceAuras then
-        local maint = ns.BuildState:GetMaintenanceAuras()
-        for lname, displayName in pairs(maint) do
-            local isSpecial = (lname == "beacon of light" or lname == "earth shield" or lname == "sacred shield" or lname == "low tide")
-            if not foundAuras[lname] then
-                if isSpecial then
-                    if not active.center then
-                        local spellIcon = select(3, GetSpellInfo(displayName)) or "Interface\\Icons\\INV_Misc_QuestionMark"
-                        active.center = { 
-                            icon = spellIcon, count = 0, duration = 0, expires = 0, 
-                            ghost = true, isMine = true 
-                        }
-                    end
-                else
-                    local priority = hotPriorityNames[lname]
-                    if priority and priority <= 4 then
-                        local spellIcon = select(3, GetSpellInfo(displayName)) or "Interface\\Icons\\INV_Misc_QuestionMark"
-                        hotBuckets[priority] = hotBuckets[priority] or {}
-                        table.insert(hotBuckets[priority], { 
-                            icon = spellIcon, count = 0, duration = 0, expires = 0, 
-                            ghost = true, isMine = true 
-                        })
-                    end
-                end
-            end
-        end
-    end
-
-    -- Populate hotList from buckets
+    -- Populate hotList from buckets (strict 4-HoT limit, active only)
     for prio = 1, 4 do
         local bucket = hotBuckets[prio]
         if bucket then
@@ -445,47 +416,63 @@ function Auras:UpdateButtonAuras(btn, cached)
             ind.icon:SetTexture(data.icon)
             ind.countText:SetText((data.count and data.count > 1) and data.count or "")
 
-            -- Mine vs Others Distinction
+            if ind.fill then
+                ind.icon:Show()
+                if data.duration and data.duration > 0 and data.expires and data.expires > 0 then
+                    local remain = data.expires - GetTime()
+                    local pct = math.max(0, math.min(1, remain / data.duration))
+                    ind.fill:SetVertexColor(pct < 0.25 and 1 or (pct < 0.5 and 1), pct < 0.25 and 0.15 or (pct < 0.5 and 0.8), pct < 0.25 and 0.15 or 0.25, 0.8)
+                    ind.fill:Show()
+                else
+                    ind.fill:SetVertexColor(0.2, 0.85, 0.25, 0.7)
+                    ind.fill:Show()
+                end
+            end
+
             if data.isMine then
                 ind.icon:SetVertexColor(1, 1, 1, 1)
                 if ind.glow then
                     if data.ghost then ind.glow:Hide() else ind.glow:Show() end
                 end
             else
-                ind.icon:SetVertexColor(0.6, 0.6, 0.6, 0.8) -- Dimmed for others
+                ind.icon:SetVertexColor(0.6, 0.6, 0.6, 0.8)
                 if ind.glow then ind.glow:Hide() end
             end
 
             if data.duration and data.duration > 0 and data.expires and data.expires > 0 then
-                ind.cd:SetCooldown(data.expires - data.duration, data.duration)
-                ind.cd:Show()
-                ind:SetScript("OnUpdate", function(selfIndicator, _)
-                    if not ns.DB.frame.showAuraTimers then
-                        selfIndicator.timerText:SetText("")
-                        return
-                    end
-                    local remain = data.expires - GetTime()
-                    if remain <= 0 then
-                        selfIndicator.timerText:SetText("")
-                        selfIndicator:SetScript("OnUpdate", nil)
-                    else
-                        if remain < 2.5 then
-                            selfIndicator.timerText:SetTextColor(1, 0.1, 0.1)
-                        elseif remain < 5 then
-                            selfIndicator.timerText:SetTextColor(1, 0.8, 0)
-                        else
-                            selfIndicator.timerText:SetTextColor(1, 1, 1)
+                if ind.cd then
+                    ind.cd:SetCooldown(data.expires - data.duration, data.duration)
+                    ind.cd:Show()
+                end
+                if ind.timerText then
+                    ind:SetScript("OnUpdate", function(selfIndicator, _)
+                        if not ns.DB.frame.showAuraTimers then
+                            selfIndicator.timerText:SetText("")
+                            return
                         end
-                        if remain > 10 then
-                            selfIndicator.timerText:SetText(math.floor(remain))
+                        local remain = data.expires - GetTime()
+                        if remain <= 0 then
+                            selfIndicator.timerText:SetText("")
+                            selfIndicator:SetScript("OnUpdate", nil)
                         else
-                            selfIndicator.timerText:SetText(string.format("%.1f", remain))
+                            if remain < 2.5 then
+                                selfIndicator.timerText:SetTextColor(1, 0.1, 0.1)
+                            elseif remain < 5 then
+                                selfIndicator.timerText:SetTextColor(1, 0.8, 0)
+                            else
+                                selfIndicator.timerText:SetTextColor(1, 1, 1)
+                            end
+                            if remain > 10 then
+                                selfIndicator.timerText:SetText(math.floor(remain))
+                            else
+                                selfIndicator.timerText:SetText(string.format("%.1f", remain))
+                            end
                         end
-                    end
-                end)
+                    end)
+                end
             else
-                ind.cd:Hide()
-                ind.timerText:SetText("")
+                if ind.cd then ind.cd:Hide() end
+                if ind.timerText then ind.timerText:SetText("") end
                 ind:SetScript("OnUpdate", nil)
             end
             ind:Show()
@@ -500,8 +487,10 @@ function Auras:UpdateButtonAuras(btn, cached)
     local hotList = (active and active.hotList) or {}
     for idx, slot in ipairs(order) do
         local ind = btn.auraIndicators and btn.auraIndicators[slot]
+        local box = btn.hotIndicators and btn.hotIndicators[slot]
         local data = (idx <= limit) and hotList[idx] or nil
         applyIndicator(ind, data)
+        applyIndicator(box, data)
     end
 
     local centerData = active and active.center

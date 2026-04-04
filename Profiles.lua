@@ -37,6 +37,8 @@ local function defaults()
             showDeficit = true,
             showRaidIcons = true,
             raidIconSize = 16,
+            hotIndicatorStyle = "classic",
+            auraIndicatorSize = 14,
             nameFontSize = 10,
             nameOffsetX = 0,
             nameOffsetY = 0,

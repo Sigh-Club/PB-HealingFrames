@@ -156,6 +156,43 @@ local function CreateAuraIndicator(parent, point, x, y)
     return f
 end
 
+local function CreateHotIndicatorBox(parent, point, x, y)
+    local f = CreateFrame("Frame", nil, parent)
+    f:SetSize(10, 10)
+    f:SetPoint(point, parent, point, x, y)
+    f:SetFrameLevel(parent:GetFrameLevel() + 10)
+    f:EnableMouse(false)
+
+    local bg = f:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints()
+    bg:SetTexture("Interface\\Buttons\\WHITE8X8")
+    bg:SetVertexColor(0, 0, 0, 0.85)
+    f.bg = bg
+
+    local icon = f:CreateTexture(nil, "ARTWORK")
+    icon:SetPoint("TOPLEFT", 1, -1)
+    icon:SetPoint("BOTTOMRIGHT", -1, 1)
+    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    icon:Hide()
+    f.icon = icon
+
+    local fill = f:CreateTexture(nil, "OVERLAY")
+    fill:SetPoint("TOPLEFT", 1, -1)
+    fill:SetPoint("BOTTOMRIGHT", -1, 1)
+    fill:SetTexture("Interface\\Buttons\\WHITE8X8")
+    fill:SetVertexColor(0.2, 0.85, 0.25, 0.7)
+    f.fill = fill
+
+    local count = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    count:SetPoint("BOTTOMRIGHT", 1, -1)
+    count:SetFont("Fonts\\FRIZQT__.TTF", 7, "OUTLINE")
+    count:SetTextColor(1, 1, 1)
+    f.countText = count
+
+    f:Hide()
+    return f
+end
+
 local HOT_ORDER_BARS = {"topleft", "bottomleft", "topright", "bottomright"}
 local HOT_ORDER_GRID = {"topleft", "topright"}
 
@@ -176,6 +213,8 @@ end
 
 local function LayoutAuraIndicators(button, isGrid, cfg)
     if not button or not button.auraIndicators then return end
+    local dbf = ns.DB and ns.DB.frame or {}
+    local style = dbf.hotIndicatorStyle or "classic"
     local order = isGrid and HOT_ORDER_GRID or HOT_ORDER_BARS
     button.hotIndicatorOrder = order
     button.hotIndicatorLimit = #order
@@ -192,11 +231,15 @@ local function LayoutAuraIndicators(button, isGrid, cfg)
 
     for idx, slot in ipairs(order) do
         local ind = button.auraIndicators[slot]
+        local box = button.hotIndicators and button.hotIndicators[slot]
         if ind then
             ind:SetSize(iconSize, iconSize)
             ind:ClearAllPoints()
             ind._disabled = false
-            if isGrid then
+            if style == "squares" then
+                ind:Hide()
+                ind._disabled = true
+            elseif isGrid then
                 local total = #order
                 local spread = iconSize + spacing
                 local start = -((total - 1) * spread) / 2
@@ -209,6 +252,31 @@ local function LayoutAuraIndicators(button, isGrid, cfg)
                 local rightIndex = idx - leftSlots
                 local offset = edgePadding + half + (rightIndex - 1) * (iconSize + spacing)
                 ind:SetPoint("CENTER", button, "RIGHT", -offset, centerY)
+            end
+        end
+        if box then
+            box:ClearAllPoints()
+            box._disabled = false
+            if style == "classic" then
+                box:Hide()
+                box._disabled = true
+            else
+                local boxSize = 10
+                box:SetSize(boxSize, boxSize)
+                if isGrid then
+                    local total = #order
+                    local spread = boxSize + 1
+                    local start = -((total - 1) * spread) / 2
+                    local offset = start + (idx - 1) * spread
+                    box:SetPoint("BOTTOM", button, "BOTTOM", offset, edgePadding)
+                elseif idx <= leftSlots then
+                    local offset = edgePadding + (boxSize / 2) + (idx - 1) * (boxSize + 1)
+                    box:SetPoint("CENTER", button, "LEFT", offset, centerY)
+                else
+                    local rightIndex = idx - leftSlots
+                    local offset = edgePadding + (boxSize / 2) + (rightIndex - 1) * (boxSize + 1)
+                    box:SetPoint("CENTER", button, "RIGHT", -offset, centerY)
+                end
             end
         end
     end
@@ -224,6 +292,11 @@ local function LayoutAuraIndicators(button, isGrid, cfg)
                 ind:Hide()
                 ind:SetScript("OnUpdate", nil)
                 ind._disabled = true
+            end
+            local box = button.hotIndicators and button.hotIndicators[slot]
+            if box then
+                box:Hide()
+                box._disabled = true
             end
         end
     end
@@ -487,6 +560,12 @@ local function CreateButton(i)
         bottomleft = CreateAuraIndicator(inter, "CENTER", 0, 0),
         bottomright = CreateAuraIndicator(inter, "CENTER", 0, 0),
         center = CreateAuraIndicator(b, "TOPRIGHT", 5, 5),
+    }
+    b.hotIndicators = {
+        topleft = CreateHotIndicatorBox(inter, "CENTER", 0, 0),
+        topright = CreateHotIndicatorBox(inter, "CENTER", 0, 0),
+        bottomleft = CreateHotIndicatorBox(inter, "CENTER", 0, 0),
+        bottomright = CreateHotIndicatorBox(inter, "CENTER", 0, 0),
     }
     b.auraIndicators.center:SetSize(18, 18)
     b.auraIndicators.center.icon:SetTexCoord(0, 1, 0, 1) -- Fuller icon for center

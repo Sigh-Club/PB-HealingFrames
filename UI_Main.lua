@@ -467,6 +467,39 @@ function UI:LoadStyle(c)
     raidSizeSlider:SetPoint("TOPLEFT", 280, y + 15)
     raidSizeSlider:SetWidth(180)
 
+    y = y - 25
+    local hotStyleLabel = c:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    hotStyleLabel:SetPoint("TOPLEFT", 15, y)
+    hotStyleLabel:SetText("HOT Indicator Style:")
+    local hotStyleDD = CreateFrame("Frame", "PB_HF_HotStyleDD", c, "UIDropDownMenuTemplate")
+    hotStyleDD:SetPoint("TOPLEFT", 15, y - 10)
+    UIDropDownMenu_Initialize(hotStyleDD, function(self, level, menu)
+        local info = UIDropDownMenu_CreateInfo()
+        info.text = "Classic (Icons)"
+        info.value = "classic"
+        info.checked = (ns.DB.frame.hotIndicatorStyle or "classic") == "classic"
+        info.func = function()
+            ns.DB.frame.hotIndicatorStyle = "classic"
+            UIDropDownMenu_SetText(hotStyleDD, "Classic (Icons)")
+            UIDropDownMenu_CloseMenu()
+            if ns.Frames then ns.Frames:ApplyLayout() end
+        end
+        UIDropDownMenu_AddButton(info)
+        info = UIDropDownMenu_CreateInfo()
+        info.text = "Squares (Boxes)"
+        info.value = "squares"
+        info.checked = ns.DB.frame.hotIndicatorStyle == "squares"
+        info.func = function()
+            ns.DB.frame.hotIndicatorStyle = "squares"
+            UIDropDownMenu_SetText(hotStyleDD, "Squares (Boxes)")
+            UIDropDownMenu_CloseMenu()
+            if ns.Frames then ns.Frames:ApplyLayout() end
+        end
+        UIDropDownMenu_AddButton(info)
+    end)
+    UIDropDownMenu_SetWidth(hotStyleDD, 140)
+    UIDropDownMenu_SetText(hotStyleDD, (ns.DB.frame.hotIndicatorStyle or "classic") == "classic" and "Classic (Icons)" or "Squares (Boxes)")
+
     y = y - 65
 
     local th3 = c:CreateFontString(nil, "OVERLAY", "GameFontNormal")
