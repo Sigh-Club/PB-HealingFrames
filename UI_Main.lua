@@ -514,6 +514,16 @@ function UI:LoadStyle(c)
     hotBrightSlider:SetPoint("TOPLEFT", 15, y)
     hotBrightSlider:SetWidth(180)
 
+    y = y - 35
+    local hotSizeSlider = mkSlider(c, "HOT Indicator Size", 8, 24, 1,
+        function() return ns.DB.frame.hotIndicatorSize or 14 end,
+        function(v)
+            ns.DB.frame.hotIndicatorSize = v
+            if ns.Frames then ns.Frames:ApplyLayout() end
+        end)
+    hotSizeSlider:SetPoint("TOPLEFT", 15, y)
+    hotSizeSlider:SetWidth(180)
+
     y = y - 50
 
     local th3 = c:CreateFontString(nil, "OVERLAY", "GameFontNormal")

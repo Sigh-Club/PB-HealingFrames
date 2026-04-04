@@ -218,8 +218,9 @@ local function LayoutAuraIndicators(button, isGrid, cfg)
     button.hotIndicatorLimit = #order
 
     local barHeight = isGrid and (cfg.size or 40) or (cfg.height or 22)
-    local iconSize = math.max(math.min(barHeight - 6, 18), 10)
-    local spacing = 2
+    local sizeOverride = dbf.hotIndicatorSize or 14
+    local iconSize = style == "squares" and sizeOverride or math.max(math.min(barHeight - 6, 18), 10)
+    local spacing = style == "squares" and 1 or 2
     local centerY = isGrid and 0 or 1
     local edgePadding = 4
     local half = iconSize / 2
@@ -259,27 +260,26 @@ local function LayoutAuraIndicators(button, isGrid, cfg)
                 box:Hide()
                 box._disabled = true
             else
-                local boxSize = 10
+                local boxSize = sizeOverride
                 box:SetSize(boxSize, boxSize)
                 if isGrid then
                     local total = #order
-                    local spread = boxSize + 1
+                    local spread = boxSize + spacing
                     local start = -((total - 1) * spread) / 2
                     local offset = start + (idx - 1) * spread
                     box:SetPoint("BOTTOM", button, "BOTTOM", offset, edgePadding)
                 elseif idx <= leftSlots then
-                    local offset = edgePadding + (boxSize / 2) + (idx - 1) * (boxSize + 1)
+                    local offset = edgePadding + (boxSize / 2) + (idx - 1) * (boxSize + spacing)
                     box:SetPoint("CENTER", button, "LEFT", offset, centerY)
                 else
                     local rightIndex = idx - leftSlots
-                    local offset = edgePadding + (boxSize / 2) + (rightIndex - 1) * (boxSize + 1)
+                    local offset = edgePadding + (boxSize / 2) + (rightIndex - 1) * (boxSize + spacing)
                     box:SetPoint("CENTER", button, "RIGHT", -offset, centerY)
                 end
             end
         end
     end
 
-    -- Disable unused indicators for current layout
     local allSlots = {"topleft", "topright", "bottomleft", "bottomright"}
     for _, slot in ipairs(allSlots) do
         local used = false
