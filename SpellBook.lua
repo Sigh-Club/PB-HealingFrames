@@ -75,14 +75,14 @@ end
 local lastScan = 0
 local lastSpellCount = 0
 
-function SpellBook:Scan(force)
+function SpellBook:Scan(force, silent)
     if InCombatLockdown() then return end
     local now = GetTime()
     if not force and now - lastScan < 5 then return end
     
     local tabCount = ns.Compat:GetNumSpellTabs()
     if not tabCount or tabCount == 0 then
-        if force then C_Timer.After(2, function() self:Scan(true) end) end
+        if force then C_Timer.After(2, function() self:Scan(true, silent) end) end
         return 
     end
 
@@ -159,16 +159,16 @@ function SpellBook:Scan(force)
     self.stats.healing = 0
     for _, e in ipairs(self.bindable) do if e.role == "heal" or e.role == "hot" or e.role == "shield_absorb" then self.stats.healing = self.stats.healing + 1 end end
     
-    if force then ns:Print(string.format("Scan complete: %d spells (%d healing)", self.stats.bindable, self.stats.healing)) end
+    if force and not silent then ns:Print(string.format("Scan complete: %d spells (%d healing)", self.stats.bindable, self.stats.healing)) end
 
     if ns.EnchantDetect then ns.EnchantDetect:FullScan() end
-    if ns.BuildState then ns.BuildState:Classify() end
+    if ns.BuildState then ns.BuildState:Classify(silent) end
 end
 
 function SpellBook:OnInitialize() end
-function SpellBook:OnEnable() C_Timer.After(5, function() self:Scan(true) end) end
+function SpellBook:OnEnable() C_Timer.After(5, function() self:Scan(true, true) end) end
 function SpellBook:OnEvent(event)
     if event == "LEARNED_SPELL_IN_TAB" or event == "SPELLS_CHANGED" or event == "PLAYER_TALENT_UPDATE" or event == "CHARACTER_POINTS_CHANGED" then
-        self:Scan()
+        self:Scan(false, true)
     end
 end

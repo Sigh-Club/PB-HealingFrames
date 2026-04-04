@@ -155,7 +155,7 @@ local function deriveThresholdRules()
     return rules
 end
 
-function BuildState:Classify()
+function BuildState:Classify(silent)
     if not ns.SpellBook then return end
     local bindable = ns.SpellBook:GetBindable()
     local counts = countByRole(bindable)
@@ -170,9 +170,11 @@ function BuildState:Classify()
     self.thresholdRules = deriveThresholdRules()
 
     if changed and newMode ~= "unknown" then
-        ns:Print("Build engine detected: " .. newMode:gsub("_", " ") .. ". SmartBind updated.")
+        if not silent then
+            ns:Print("Build engine detected: " .. newMode:gsub("_", " ") .. ". SmartBind updated.")
+        end
         if ns.Bindings and ns.Bindings.SmartBind then
-            ns.Bindings:SmartBind()
+            ns.Bindings:SmartBind(silent)
         end
     end
 
@@ -217,17 +219,17 @@ function BuildState:GetThresholdRules()
 end
 
 function BuildState:OnInitialize()
-    self:Classify()
+    self:Classify(true)
 end
 
 function BuildState:OnEnable()
-    self:Classify()
+    self:Classify(true)
 end
 
 function BuildState:OnEvent(event)
     if event == "PLAYER_TALENT_UPDATE" or event == "CHARACTER_POINTS_CHANGED" then
-        self:Classify()
+        self:Classify(true)
     elseif event == "PLAYER_REGEN_ENABLED" then
-        self:Classify()
+        self:Classify(true)
     end
 end

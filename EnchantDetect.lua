@@ -156,7 +156,7 @@ function EnchantDetect:OnEvent(event)
     elseif event == "SPELLS_CHANGED" or event == "LEARNED_SPELL_IN_TAB" then
         self:FullScan()
         if ns.BuildState then
-            ns.BuildState:Classify()
+            ns.BuildState:Classify(true)
         end
     end
 end
