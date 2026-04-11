@@ -744,13 +744,15 @@ local function CreateBindCapture()
     cancel:SetSize(80, 20); cancel:SetPoint("BOTTOM", 0, 10); cancel:SetText("Cancel")
     cancel:SetScript("OnClick", function() f:Hide() end)
     
-    local blocker = CreateFrame("Frame", nil, f)
+    local blocker = CreateFrame("Button", nil, UIParent)
     blocker:SetAllPoints(UIParent)
     blocker:SetFrameStrata("TOOLTIP")
-    blocker:SetFrameLevel(f:GetFrameLevel() + 10) -- Ensure blocker is on TOP of everything
+    blocker:SetFrameLevel(f:GetFrameLevel() + 10)
     blocker:EnableMouse(true)
     blocker:EnableMouseWheel(true)
     blocker:EnableKeyboard(true)
+    blocker:RegisterForClicks("AnyDown")
+    blocker:Hide()
     
     local function finish(slot)
         f:Hide()
@@ -758,12 +760,16 @@ local function CreateBindCapture()
         if f.callback then f.callback(slot) end
     end
 
-    blocker:SetScript("OnMouseDown", function(_, button)
+    local function captureClick(button)
         local mods = ""
         if IsShiftKeyDown() then mods = mods .. "Shift-" end
         if IsControlKeyDown() then mods = mods .. "Ctrl-" end
         if IsAltKeyDown() then mods = mods .. "Alt-" end
         finish(mods .. button)
+    end
+
+    blocker:SetScript("OnClick", function(_, button)
+        captureClick(button)
     end)
 
     blocker:SetScript("OnMouseWheel", function(_, delta)
