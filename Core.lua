@@ -38,10 +38,11 @@ function ns:Print(msg)
 end
 
 ns.secureQueue = {}
+ns._ATTR_SENTINEL = newproxy(true)
 function ns:SafeSetAttribute(btn, name, value)
     if InCombatLockdown() then
         self.secureQueue[btn] = self.secureQueue[btn] or {}
-        self.secureQueue[btn][name] = value
+        self.secureQueue[btn][name] = (value == nil) and self._ATTR_SENTINEL or value
     else
         btn:SetAttribute(name, value)
     end
@@ -51,7 +52,10 @@ local function ProcessSecureQueue()
     if InCombatLockdown() then return end
     for btn, attrs in pairs(ns.secureQueue) do
         for name, value in pairs(attrs) do
-            btn:SetAttribute(name, value)
+            local ok, err = pcall(btn.SetAttribute, btn, name, value == ns._ATTR_SENTINEL and nil or value)
+            if not ok then
+                ns:Print("SafeSetAttribute flush error: " .. tostring(err))
+            end
         end
         ns.secureQueue[btn] = nil
     end
@@ -86,6 +90,9 @@ local function EnsureSaved()
     ns.DB.spellRoles = ns.DB.spellRoles or {}
     ns.DB.engineMode = ns.DB.engineMode or "unknown"
     if ns.DB.bindingsCustomized == nil then ns.DB.bindingsCustomized = false end
+    if ns.DB.frame.showPetPanel == nil then ns.DB.frame.showPetPanel = false end
+    if ns.DB.frame.showTankPetsInline == nil then ns.DB.frame.showTankPetsInline = true end
+    ns.DB.frame.petPanelPosition = ns.DB.frame.petPanelPosition or {}
     
     local f = ns.DB.frame
     f.layoutStyle = f.layoutStyle or "bars"
@@ -144,7 +151,8 @@ frame:RegisterEvent("ADDON_LOADED")
 frame:RegisterEvent("PLAYER_LOGIN")
 frame:RegisterEvent("PLAYER_ENTERING_WORLD")
 
-frame:SetScript("OnEvent", function(self, event, arg1)
+frame:SetScript("OnEvent", function(self, event, ...)
+    local arg1 = ...
     if event == "ADDON_LOADED" and arg1 == addonName then
         Bootstrap()
     elseif event == "PLAYER_LOGIN" or event == "PLAYER_ENTERING_WORLD" then
@@ -154,7 +162,7 @@ frame:SetScript("OnEvent", function(self, event, arg1)
     end
     
     if isBootstrapped then
-        ns:IterModules("OnEvent", event, arg1)
+        ns:IterModules("OnEvent", event, ...)
     end
 end)
 
@@ -164,8 +172,6 @@ local events = {
     "UNIT_HEALTH", "UNIT_MAXHEALTH", "UNIT_AURA", "UNIT_POWER", "UNIT_DISPLAYPOWER",
     "LEARNED_SPELL_IN_TAB", "PLAYER_TALENT_UPDATE", "SKILL_LINES_CHANGED", "CHARACTER_POINTS_CHANGED", "SPELLS_CHANGED",
     "PLAYER_REGEN_ENABLED", "PLAYER_TARGET_CHANGED", "PLAYER_FOCUS_CHANGED", "RAID_TARGET_UPDATE",
-    "COMBAT_LOG_EVENT_UNFILTERED", "PLAYER_REGEN_DISABLED"
+    "COMBAT_LOG_EVENT_UNFILTERED", "PLAYER_REGEN_DISABLED", "UNIT_PET"
  }
 for _, ev in ipairs(events) do frame:RegisterEvent(ev) end
-
-if IsLoggedIn() then Bootstrap() end

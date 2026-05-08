@@ -28,6 +28,18 @@ function HealCommModule:UpdateHealComm(event, casterGUID, spellID, healType, end
                 self:UpdateUnit(b)
             end
         end
+        for _, b in ipairs(ns.Frames.tankPetButtons or {}) do
+            if b:IsShown() then
+                self:UpdateUnit(b)
+            end
+        end
+        if ns.PetFrames then
+            for _, b in ipairs(ns.PetFrames.buttons or {}) do
+                if b:IsShown() then
+                    self:UpdateUnit(b)
+                end
+            end
+        end
         return
     end
 
@@ -47,34 +59,71 @@ function HealCommModule:UpdateHealComm(event, casterGUID, spellID, healType, end
             end
         end
     end
+    for _, b in ipairs(ns.Frames.tankPetButtons or {}) do
+        if b:IsShown() and b.unit then
+            local guid = UnitGUID(b.unit)
+            if guid and units[guid] then
+                self:UpdateUnit(b)
+            end
+        end
+    end
+    if ns.PetFrames then
+        for _, b in ipairs(ns.PetFrames.buttons or {}) do
+            if b:IsShown() and b.unit then
+                local guid = UnitGUID(b.unit)
+                if guid and units[guid] then
+                    self:UpdateUnit(b)
+                end
+            end
+        end
+    end
 end
 
 function HealCommModule:UpdateUnit(b)
-    if not b or not b.incHeal then return end
-    
+    if not b then return end
+
+    local mine = b.incHealMine
+    local others = b.incHealOthers
+    if not mine or not others then return end
+
     if not LHC or not b.unit or b.fakeData or not ns.DB.frame.showHealComm then
-        b.incHeal:SetValue(0)
-        b.incHeal:Hide()
+        mine:SetValue(0)
+        mine:Hide()
+        others:SetValue(0)
+        others:Hide()
         return
     end
 
     local guid = UnitGUID(b.unit)
-    if not guid then 
-        b.incHeal:SetValue(0)
-        b.incHeal:Hide()
-        return 
+    if not guid then
+        mine:SetValue(0)
+        mine:Hide()
+        others:SetValue(0)
+        others:Hide()
+        return
     end
 
-    local healAmount = LHC:GetOthersHealAmount(guid, LHC.ALL_HEALS) or 0
-    local myAmount = LHC:GetHealAmount(guid, LHC.ALL_HEALS) or 0
-    local total = healAmount + myAmount
-    
-    if total > 0 then
-        local hp = UnitHealth(b.unit) or 0
-        b.incHeal:SetValue(hp + total)
-        b.incHeal:Show()
+    local othersAmount = LHC:GetOthersHealAmount(guid, LHC.ALL_HEALS) or 0
+    local playerGUID = UnitGUID("player")
+    local myAmount = 0
+    if playerGUID then
+        myAmount = LHC:GetHealAmount(guid, LHC.ALL_HEALS, nil, playerGUID) or 0
+    end
+    local hp = UnitHealth(b.unit) or 0
+
+    if othersAmount > 0 then
+        others:SetValue(hp + othersAmount)
+        others:Show()
     else
-        b.incHeal:SetValue(0)
-        b.incHeal:Hide()
+        others:SetValue(0)
+        others:Hide()
+    end
+
+    if myAmount > 0 then
+        mine:SetValue(hp + othersAmount + myAmount)
+        mine:Show()
+    else
+        mine:SetValue(0)
+        mine:Hide()
     end
 end

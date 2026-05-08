@@ -49,11 +49,25 @@ local function countByRole(bindable)
     local intel = ns.HealingIntel or {}
     local d2hNames = intel.roleSpellNames and intel.roleSpellNames.damage_to_heal or {}
     for _, entry in ipairs(bindable or {}) do
-        if entry.name and not entry.role then
+        if entry.name then
+            local isD2H = false
             for _, d2hName in ipairs(d2hNames) do
                 if lower(entry.name) == lower(d2hName) then
-                    counts.damage_to_heal = counts.damage_to_heal + 1
+                    isD2H = true
                     break
+                end
+            end
+            if isD2H then
+                counts.damage_to_heal = counts.damage_to_heal + 1
+                if not entry.role then
+                    counts.total = counts.total + 1
+                end
+            elseif not entry.role then
+                for _, d2hName in ipairs(d2hNames) do
+                    if lower(entry.name) == lower(d2hName) then
+                        counts.damage_to_heal = counts.damage_to_heal + 1
+                        break
+                    end
                 end
             end
         end
@@ -67,7 +81,7 @@ local function detectEngineMode(counts)
     local hasProc = ns.CombatLog and ns.CombatLog.HasDamageToHealProc
     local hasD2HProc = hasProc and ns.CombatLog:HasDamageToHealProc()
 
-    if counts.damage_to_heal >= 2 and (hasD2HProc or (ed and (ed:IsEnchantActive("atonement") or ed:IsEnchantActive("dominantWordShield")))) then
+    if counts.damage_to_heal >= 2 and (hasD2HProc or (ed and ed:IsEnchantActive("atonement"))) then
         return "damage_to_heal"
     end
 

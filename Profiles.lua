@@ -47,6 +47,9 @@ local function defaults()
             statusFontSize = 8,
             splitGroups = false,
             groupPositions = {},
+            showPetPanel = false,
+            showTankPetsInline = true,
+            petPanelPosition = {},
             bars = {
                 width = 160, height = 20, spacing = 3, scale = 1,
                 groupsPerRow = 4, groupSpacing = 12,
@@ -69,6 +72,8 @@ local function defaults()
         },
         bindings = {},
         spellRoles = {},
+        engineMode = "unknown",
+        bindingsCustomized = false,
     }
 end
 
@@ -122,7 +127,11 @@ function Profiles:SetProfile(name)
     ns.DB = PB_HF_DB.profiles[name]
     copyMissing(ns.DB, defaults())
     
-    -- Refresh everything
+    if InCombatLockdown() then
+        ns:Print("Profile will apply after combat ends")
+        return
+    end
+    
     if ns.Frames then ns.Frames:ApplyLayout() end
     if ns.ClickCast then ns.ClickCast:RefreshAll() end
     if ns.Roster then ns.Roster:Refresh() end
@@ -153,6 +162,11 @@ function Profiles:ResetCurrentProfile()
     local name = self:GetProfileName()
     PB_HF_DB.profiles[name] = deepCopy(defaults())
     ns.DB = PB_HF_DB.profiles[name]
+    
+    if InCombatLockdown() then
+        ns:Print("Profile reset will apply after combat ends")
+        return
+    end
     
     if ns.Frames then ns.Frames:ApplyLayout() end
     if ns.ClickCast then ns.ClickCast:RefreshAll() end

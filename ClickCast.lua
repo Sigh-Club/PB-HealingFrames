@@ -39,10 +39,12 @@ local function clearBinding(btn, slot)
     local tkey = (prefix and (prefix .. "-type" .. index)) or ("type" .. index)
     local skey = (prefix and (prefix .. "-spell" .. index)) or ("spell" .. index)
     local mkey = (prefix and (prefix .. "-macrotext" .. index)) or ("macrotext" .. index)
+    local mnkey = (prefix and (prefix .. "-macro" .. index)) or ("macro" .. index)
     
     ns:SafeSetAttribute(btn, tkey, nil)
     ns:SafeSetAttribute(btn, skey, nil)
     ns:SafeSetAttribute(btn, mkey, nil)
+    ns:SafeSetAttribute(btn, mnkey, nil)
 end
 
 local function applyBinding(btn, slot, data)
@@ -60,7 +62,7 @@ local function applyBinding(btn, slot, data)
     elseif data.type == "target" then
         ns:SafeSetAttribute(btn, tkey, "target")
     elseif data.type == "menu" then
-        ns:SafeSetAttribute(btn, tkey, "menu")
+        ns:SafeSetAttribute(btn, tkey, "togglemenu")
     elseif data.type == "macro" and data.value and data.value ~= "" then
         ns:SafeSetAttribute(btn, tkey, "macro")
         ns:SafeSetAttribute(btn, mkey, data.value)
@@ -88,8 +90,10 @@ function ClickCast:ApplyBindings(btn)
     end
 end
 
-function ClickCast:OnLeaveCombat()
-    self:RefreshAll()
+function ClickCast:OnEvent(event)
+    if event == "PLAYER_REGEN_ENABLED" then
+        self:RefreshAll()
+    end
 end
 
 function ClickCast:OnEnable()

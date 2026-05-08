@@ -36,7 +36,7 @@ local function guessRole(slot, link)
         pcall(function() tooltip:SetSpellBookItem(slot, "spell") end)
     end
     
-    local name = GetSpellBookItemName(slot, "spell")
+    local name = ns.Compat:GetSpellName(slot)
     if not name then return nil end
     
     local lname = lower(name)
@@ -74,6 +74,8 @@ end
 
 local lastScan = 0
 local lastSpellCount = 0
+local scanRetries = 0
+local MAX_SCAN_RETRIES = 5
 
 function SpellBook:Scan(force, silent)
     if InCombatLockdown() then return end
@@ -82,9 +84,13 @@ function SpellBook:Scan(force, silent)
     
     local tabCount = ns.Compat:GetNumSpellTabs()
     if not tabCount or tabCount == 0 then
-        if force then C_Timer.After(2, function() self:Scan(true, silent) end) end
+        if force and scanRetries < MAX_SCAN_RETRIES then
+            scanRetries = scanRetries + 1
+            C_Timer.After(2, function() self:Scan(true, silent) end)
+        end
         return 
     end
+    scanRetries = 0
 
     local currentCount = 0
     for tab = 1, tabCount do
@@ -125,9 +131,9 @@ function SpellBook:Scan(force, silent)
                 end
                 table.insert(self.raw, entry)
                 
-                if not (opts.excludeGeneral and entry.isGeneral) and not (entry.isPassive) and not (opts.excludeProfessions and entry.isTrade) then
+                if not (opts.excludeGeneral and entry.isGeneral) and not (opts.excludePassive and entry.isPassive) and not (opts.excludeProfessions and entry.isTrade) then
                     local k = lower(name)
-                    if not seen[k] then
+                    if opts.dedupeByName == false or not seen[k] then
                         seen[k] = true
                         table.insert(self.bindable, entry)
                         self.byName[k] = entry

@@ -143,18 +143,20 @@ function EnchantDetect:FullScan(silent)
 end
 
 function EnchantDetect:OnInitialize()
-    self:FullScan()
+    self:FullScan(true)
 end
 
 function EnchantDetect:OnEnable()
-    self:FullScan()
+    self:FullScan(true)
 end
 
-function EnchantDetect:OnEvent(event)
+function EnchantDetect:OnEvent(event, unit)
     if event == "UNIT_AURA" then
-        self:ScanPlayerAuras()
+        if unit == "player" then
+            self:ScanPlayerAuras()
+        end
     elseif event == "SPELLS_CHANGED" or event == "LEARNED_SPELL_IN_TAB" then
-        self:FullScan()
+        self:FullScan(true)
         if ns.BuildState then
             ns.BuildState:Classify(true)
         end

@@ -56,7 +56,7 @@ local function classifySpell(spellId, spellName)
             if role == "buff" or role == "support" then return "buff" end
         end
     end
-    return "damage"
+    return nil
 end
 
 local function updateProcGraph(sourceSpellId, destSpellId, amount)
@@ -125,9 +125,9 @@ function CombatLog:OnEvent(event, ...)
     if healSubevents[subevent] then
         local sourceGUID = select(3, ...)
         local destGUID = select(7, ...)
-        local spellId = select(10, ...)
-        local spellName = select(11, ...)
-        local amount = select(13, ...)
+        local spellId = select(11, ...)
+        local spellName = select(12, ...)
+        local amount = select(14, ...)
 
         if sourceGUID == playerGUID and amount and amount > 0 then
             local now = GetTime()
@@ -135,6 +135,8 @@ function CombatLog:OnEvent(event, ...)
             for dmgSpellId, dmgData in pairs(pending) do
                 if now - dmgData.time <= PROC_WINDOW then
                     updateProcGraph(dmgSpellId, spellId, amount)
+                else
+                    pending[dmgSpellId] = nil
                 end
             end
 
@@ -145,20 +147,22 @@ function CombatLog:OnEvent(event, ...)
 
     elseif damageSubevents[subevent] then
         local sourceGUID = select(3, ...)
-        local spellId = select(10, ...)
-        local amount = select(13, ...)
+        local spellId = select(11, ...)
+        local amount = select(14, ...)
 
         if sourceGUID == playerGUID and spellId then
             self.pendingDamage[spellId] = { time = GetTime(), amount = amount or 0 }
-            self.throughput.damageGCDs = self.throughput.damageGCDs + 1
+            if subevent == "SPELL_DAMAGE" then
+                self.throughput.damageGCDs = self.throughput.damageGCDs + 1
+            end
             self.throughput.totalDamage = self.throughput.totalDamage + (amount or 0)
             self.throughput.lastUpdate = GetTime()
         end
 
     elseif castSuccessSubevents[subevent] then
         local sourceGUID = select(3, ...)
-        local spellId = select(10, ...)
-        local spellName = select(11, ...)
+        local spellId = select(11, ...)
+        local spellName = select(12, ...)
 
         if sourceGUID == playerGUID then
             local kind = classifySpell(spellId, spellName)
@@ -258,10 +262,6 @@ end
 
 function CombatLog:OnEnable()
     playerGUID = UnitGUID("player")
-    if ns.frame then
-        ns.frame:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
-        ns.frame:RegisterEvent("PLAYER_REGEN_DISABLED")
-    end
 end
 
 local decayTimer = 0

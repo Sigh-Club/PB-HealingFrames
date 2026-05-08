@@ -2,8 +2,9 @@
 ## Title: PB: Healing Frames
 ## Notes: Ascension-compatible healing frames and click-casting for 3.3.5a
 ## Author: Sigh-Club
-## Version: 1.3.5-beta
+## Version: 1.3.6-beta
 ## SavedVariables: PB_HF_DB, PB_HF_Global
+## OptionalDeps: LibHealComm-4.0
 
 Core.lua
 Debug.lua
@@ -23,5 +24,6 @@ Auras.lua
 HealComm.lua
 ClickCast.lua
 Frames.lua
+PetFrames.lua
 UI_Main.lua
 Commands.lua

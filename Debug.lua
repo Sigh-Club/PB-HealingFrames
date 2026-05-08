@@ -1,6 +1,7 @@
 
 local _, ns = ...
 local Debug = ns:RegisterModule("Debug", {})
+ns.Debug = Debug
 
 local function isEnabled()
     return ns.DB and ns.DB.debug and true or false

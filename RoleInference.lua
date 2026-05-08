@@ -18,11 +18,11 @@ local function normalizeKit(sig)
     end
     if maxVal == 0 then maxVal = 1 end
     return {
-        heal = sig.heal / maxVal,
-        hot = sig.hot / maxVal,
-        shield = sig.shield / maxVal,
-        d2h = sig.d2h / maxVal,
-        support = sig.support / maxVal,
+        heal = (sig.heal or 0) / maxVal,
+        hot = (sig.hot or 0) / maxVal,
+        shield = (sig.shield or 0) / maxVal,
+        d2h = (sig.d2h or 0) / maxVal,
+        support = (sig.support or 0) / maxVal,
     }
 end
 
@@ -81,6 +81,10 @@ function RoleInference:Compute()
         support = support,
         dps = dps,
     }
+end
+
+function RoleInference:Update()
+    self:Compute()
 end
 
 function RoleInference:GetRoleVector()

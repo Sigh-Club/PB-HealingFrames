@@ -37,6 +37,13 @@ SlashCmdList["PBHF"] = function(msg)
         else
             if ns.Roster then ns.Roster:SetFakeMode(true, n or 10) end
         end
+    elseif msg:match("^pettest") then
+        local n = tonumber(msg:match("pettest%s+(%d+)"))
+        if msg == "pettest off" then
+            if ns.PetFrames then ns.PetFrames:SetFakeMode(false) end
+        else
+            if ns.PetFrames then ns.PetFrames:SetFakeMode(true, n or 5) end
+        end
     elseif msg:match("^debug") then
         local args = trim(msg:sub(6))
         if args == "" then
@@ -66,9 +73,11 @@ SlashCmdList["PBHF"] = function(msg)
         end
     elseif msg == "lock" then
         ns.DB.locked = true
+        ns:Print(ns.L and ns.L.CFG_LOCKED or "Frames locked")
     elseif msg == "unlock" then
         ns.DB.locked = false
+        ns:Print(ns.L and ns.L.CFG_UNLOCKED or "Frames unlocked")
     else
-        -- ns:Print("Usage: /pb [config|scan|smartbind|test 5-40|debug|sample|lock|unlock]")
+        ns:Print("Usage: /pb [config|on|off|toggle|scan|smartbind|test 5-40|pettest 1-40|debug on|off|sample|lock|unlock]")
     end
 end

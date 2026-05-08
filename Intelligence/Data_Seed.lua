@@ -1,6 +1,5 @@
 
 local _, ns = ...
-ns = ns or _G.PB_HealingFrames or {}
 _G.PB_HealingFrames = ns
 
 local HI = ns.HealingIntel or {}
@@ -14,13 +13,13 @@ HI.design_principles = {
 }
 
 HI.roleSpellIds = {
-    direct_heal = { 2050, 2054, 2060, 2061, 635, 19750, 331, 8004, 8005, 5185, 8936, 50464, 1064, 596, 34861, 48785 },
+    direct_heal = { 2050, 2054, 2060, 2061, 19750, 331, 8004, 8005, 5185, 8936, 50464, 1064, 596, 34861, 48785 },
     hot = { 139, 774, 33763, 48438, 61295, 33076, 115151, 124682, 124081, 115098, 123586, 73920, 52042 },
     shield_absorb = { 17, 47515, 53563, 53601, 974 },
     cleanse = { 4987, 527, 528, 552, 475, 2782, 2893, 8946, 51886 },
     resurrection = { 2006, 7328, 50769, 20484, 20773 },
-    support = { 33206, 47788, 29166, 10060, 16190, 6940, 1022, 1044, 53563 },
-    damage_to_heal = { 20473, 635, 585, 20271 },
+    support = { 33206, 47788, 29166, 10060, 16190, 6940, 1022, 1044 },
+    damage_to_heal = { 20473, 585, 20271, 14914 },
 }
 
 HI.healingRoles = {
@@ -56,9 +55,8 @@ HI.roleSpellNames = {
         "Glimmer of Light", "Beacon of Virtue", "Blessed Recovery"
     },
     shield_absorb = {
-        "Power Word: Shield", "Sacred Shield", "Earth Shield", "Divine Aegis", "Beacon of Light",
-        "Shields of Dominance", "Dominant Word: Shield", "Sheath of Light", "Improved Power Word: Shield",
-        "Borrowed Time"
+        "Power Word: Shield", "Sacred Shield", "Earth Shield", "Divine Aegis",
+        "Shields of Dominance", "Dominant Word: Shield",
     },
     cleanse = {
         "Cleanse", "Purify", "Cure Disease", "Abolish Disease", "Remove Curse",
@@ -79,7 +77,7 @@ HI.roleSpellNames = {
         "Blessing of Sanctuary", "Greater Blessing of Sanctuary"
     },
     form = { "Tree of Life" },
-    damage_to_heal = { "Holy Shock", "Judgement", "Smite", "Atonement", "Penance" },
+    damage_to_heal = { "Holy Shock", "Judgement", "Smite", "Holy Fire", "Atonement", "Penance" },
     proc_heal = { "Atonement", "Prayer of Mending", "Cauterizing Flames" },
     smart_heal = { "Chain Heal", "Prayer of Healing", "Wild Growth", "Circle of Life", "Prayer of Mending" },
 }
@@ -114,9 +112,9 @@ HI.trackedAuras = {
 }
 
 HI.dispelAbilities = {
-    Magic = { 4987, 527, 528 },
+    Magic = { 527, 528 },
     Curse = { 475, 2782, 51886 },
-    Disease = { 4987, 528, 552 },
+    Disease = { 4987, 552 },
     Poison = { 4987, 2893, 8946 },
 }
 
@@ -145,9 +143,17 @@ end
 for role, ids in pairs(HI.roleSpellIds) do
     for _, id in ipairs(ids) do addRole(role, id) end
 end
-for role, names in pairs(HI.roleSpellNames) do
-    for _, name in ipairs(names) do
-        HI.knownSpellRolesByName[string.lower(name)] = role
+
+local _rolePriority = {
+    "damage_to_heal", "hot", "shield_absorb", "direct_heal",
+    "support", "buff", "proc_heal", "smart_heal", "cleanse", "resurrection", "form",
+}
+for _, role in ipairs(_rolePriority) do
+    local names = HI.roleSpellNames[role]
+    if names then
+        for _, name in ipairs(names) do
+            HI.knownSpellRolesByName[string.lower(name)] = role
+        end
     end
 end
 

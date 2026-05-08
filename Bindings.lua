@@ -101,7 +101,9 @@ function Bindings:SetBinding(slot, btype, value)
 end
 
 function Bindings:Get(slot)
-    return ns.DB.bindings[slot] or { type = "spell", value = "" }
+    local rec = ns.DB.bindings[slot]
+    if rec then return rec end
+    return nil, false
 end
 
 function Bindings:SetSpell(slot, spellName)
@@ -113,7 +115,7 @@ function Bindings:SetTarget(slot)
 end
 
 function Bindings:SetMenu(slot)
-    self:SetBinding(slot, "menu", "")
+    self:SetBinding(slot, "togglemenu", "")
 end
 
 function Bindings:SetMacro(slot, macroText)
@@ -146,9 +148,9 @@ local function pickBestCleanseSpell(knownSpells, bindable)
 end
 
 function Bindings:SmartBind(silent)
-    ns:Debug("SmartBind: Starting...", true)
+    if not silent then ns:Debug("SmartBind: Starting...", true) end
     if InCombatLockdown() then
-        ns:Debug("SmartBind failed: Player in combat", true)
+        if not silent then ns:Debug("SmartBind failed: Player in combat", true) end
         return
     end
 
@@ -165,11 +167,11 @@ function Bindings:SmartBind(silent)
     end
     if not prioritiesMap then
         prioritiesMap = fallbackSmartBindPriorities
-        ns:Debug("SmartBind fallback active", true)
+        if not silent then ns:Debug("SmartBind fallback active", true) end
     end
 
     local bindable = (ns.SpellBook and ns.SpellBook.GetBindable and ns.SpellBook:GetBindable()) or {}
-    ns:Debug("SmartBind: Bindable spells count: " .. #bindable, true)
+    if not silent then ns:Debug("SmartBind: Bindable spells count: " .. #bindable, true) end
     if #bindable == 0 then
         return
     end
@@ -190,6 +192,15 @@ function Bindings:SmartBind(silent)
         normalizedKnown[normalize(resolved)] = resolved
     end
 
+    if ns.EnchantDetect and ns.EnchantDetect.GetActiveOverrides then
+        for baseName, ov in pairs(ns.EnchantDetect:GetActiveOverrides()) do
+            if ov and ov.overrideName then
+                knownSpells[baseName] = ov.overrideName
+                normalizedKnown[normalize(baseName)] = ov.overrideName
+            end
+        end
+    end
+
     wipe(ns.DB.bindings)
 
     local usedSpells = {}
@@ -200,7 +211,8 @@ function Bindings:SmartBind(silent)
     if caps and (caps.Magic or caps.Curse or caps.Disease or caps.Poison) then
         local cleanseSlot = nil
         for _, candidateSlot in ipairs({ "Shift-LeftButton", "MiddleButton", "Button5" }) do
-            if isEmpty(self:Get(candidateSlot)) then
+            local existing = ns.DB.bindings[candidateSlot]
+            if not existing or not existing.value or existing.value == "" then
                 cleanseSlot = candidateSlot
                 break
             end
@@ -209,11 +221,8 @@ function Bindings:SmartBind(silent)
         if cleanseSlot then
             local bestCleanse = pickBestCleanseSpell(knownSpells, bindable)
             if bestCleanse then
-                local rec = self:Get(cleanseSlot)
-                rec.type = "macro"
-                rec.value = "/cast [@mouseover,help,nodead][] " .. bestCleanse
+                self:SetBinding(cleanseSlot, "macro", "/cast [@mouseover,help,nodead][] " .. bestCleanse)
                 usedSpells[bestCleanse:lower()] = true
-                changesMade = changesMade + 1
             end
         end
     end

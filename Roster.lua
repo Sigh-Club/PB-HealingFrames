@@ -3,6 +3,8 @@ local Roster = ns:RegisterModule("Roster", {})
 ns.Roster = Roster
 
 Roster.entries = {}
+Roster.petEntries = {}
+Roster.tankPetMap = {}
 Roster.fakeIcons = {}
 Roster.anchorKey = "party"
 
@@ -13,6 +15,42 @@ local testNames = {
     "Stonebind", "Dawnpetal", "Nightquill", "Ironbark", "Starward", "Sablemist", "Wispheart", "Netherdew",
     "Moonquartz", "Gravewillow", "Skydrift", "Thornwatch", "Silverreed", "Auricvale", "Dreamfen", "Brassroot"
 }
+
+local function buildPetList()
+    wipe(Roster.petEntries)
+    wipe(Roster.tankPetMap)
+    if ns.DB.frame.fakePetMode then return end
+    if UnitInRaid("player") then
+        for i = 1, GetNumRaidMembers() do
+            local petUnit = "raidpet" .. i
+            if UnitExists(petUnit) and UnitPlayerControlled(petUnit) then
+                local _, _, subgroup = GetRaidRosterInfo(i)
+                table.insert(Roster.petEntries, { unit = petUnit, group = subgroup or 1, fake = false, ownerUnit = "raid" .. i })
+            end
+            local _, _, _, _, _, _, _, _, _, raidRole = GetRaidRosterInfo(i)
+            if raidRole == "MAINTANK" then
+                local tankPetUnit = "raidpet" .. i
+                if UnitExists(tankPetUnit) and UnitPlayerControlled(tankPetUnit) then
+                    Roster.tankPetMap["raid" .. i] = tankPetUnit
+                end
+            end
+        end
+    elseif GetNumPartyMembers() > 0 then
+        if UnitExists("pet") and UnitPlayerControlled("pet") then
+            table.insert(Roster.petEntries, { unit = "pet", group = 1, fake = false, ownerUnit = "player" })
+        end
+        for i = 1, GetNumPartyMembers() do
+            local petUnit = "partypet" .. i
+            if UnitExists(petUnit) and UnitPlayerControlled(petUnit) then
+                table.insert(Roster.petEntries, { unit = petUnit, group = 1, fake = false, ownerUnit = "party" .. i })
+            end
+        end
+    else
+        if UnitExists("pet") and UnitPlayerControlled("pet") then
+            table.insert(Roster.petEntries, { unit = "pet", group = 1, fake = false, ownerUnit = "player" })
+        end
+    end
+end
 
 local function buildLiveList()
     wipe(Roster.entries)
@@ -31,11 +69,14 @@ local function buildLiveList()
     end
     local count = #Roster.entries
     Roster.anchorKey = (count > 5 or UnitInRaid("player")) and "raid" or "party"
+    buildPetList()
 end
 
 local function buildFakeList(size)
     wipe(Roster.entries)
     wipe(Roster.fakeIcons)
+    wipe(Roster.petEntries)
+    wipe(Roster.tankPetMap)
     local debuffTypes = { "Magic", "Curse", "Poison", "Disease" }
     for i = 1, size do
         local guid = "FakeGUID" .. i
@@ -46,7 +87,7 @@ local function buildFakeList(size)
             group = math.floor((i-1)/5) + 1,
             fake = true,
             classToken = ({"PRIEST", "PALADIN", "SHAMAN", "DRUID", "MAGE", "WARLOCK", "ROGUE", "WARRIOR"})[(i-1)%8 + 1],
-            fakeDebuff = (i % 4 == 0) and debuffTypes[(i/4)%4 + 1] or nil,
+            fakeDebuff = (i % 4 == 0) and debuffTypes[math.floor((i/4)%4 + 1)] or nil,
             raidIcon = raidIcon,
             guid = guid
         })
@@ -63,6 +104,9 @@ function Roster:Refresh()
         if ns.Frames.RefreshContainerPosition then
             ns.Frames:RefreshContainerPosition()
         end
+    end
+    if ns.PetFrames and ns.DB.frame.showPetPanel then
+        ns.PetFrames:ApplyLayout()
     end
 end
 
@@ -84,7 +128,15 @@ function Roster:OnEnable()
 end
 
 function Roster:OnEvent(event)
-    if event == "PLAYER_ENTERING_WORLD" or event == "PARTY_MEMBERS_CHANGED" or event == "RAID_ROSTER_UPDATE" then
+    if event == "PLAYER_ENTERING_WORLD" then
         if not ns.DB.frame.fakeMode then self:Refresh() end
+    elseif event == "PARTY_MEMBERS_CHANGED" or event == "RAID_ROSTER_UPDATE" then
+        if not ns.DB.frame.fakeMode then self:Refresh() end
+    elseif event == "UNIT_PET" then
+        if not ns.DB.frame.fakeMode and not ns.DB.frame.fakePetMode then
+            buildPetList()
+            if ns.Frames then ns.Frames:ApplyLayout() end
+            if ns.PetFrames and ns.DB.frame.showPetPanel then ns.PetFrames:ApplyLayout() end
+        end
     end
 end

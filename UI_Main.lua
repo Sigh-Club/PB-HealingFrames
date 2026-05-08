@@ -121,7 +121,7 @@ function UI:CreateMainWindow()
     local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetFont("Fonts\\FRIZQT__.TTF", 20, "OUTLINE")
     title:SetPoint("LEFT", headerIcon, "RIGHT", 10, 0)
-    title:SetText("PB: Healing Frames V 1.3.6 beta")
+    title:SetText("PB: Healing Frames V1.3.6 beta")
 
     local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", -5, -5)
@@ -235,6 +235,23 @@ function UI:LoadGeneral(c)
         end)
     c.fakeSize:SetPoint("TOPLEFT", 15, y); y = y - 55
 
+    local petPanel = mkCheck(c, "Show Pet Panel", "Show a separate panel for party/raid pets.",
+        function() return ns.DB.frame.showPetPanel end,
+        function(v)
+            ns.DB.frame.showPetPanel = v
+            if ns.PetFrames then ns.PetFrames:ApplyLayout() end
+            if ns.Frames then ns.Frames:ApplyLayout() end
+        end)
+    petPanel:SetPoint("TOPLEFT", 15, y); y = y - 32
+
+    local tankPetsInline = mkCheck(c, "Tank Pets Inline", "Show tank pet bars below their owner in raid frames.",
+        function() return ns.DB.frame.showTankPetsInline end,
+        function(v)
+            ns.DB.frame.showTankPetsInline = v
+            if ns.Frames then ns.Frames:ApplyLayout() end
+        end)
+    tankPetsInline:SetPoint("TOPLEFT", 15, y); y = y - 40
+
     local th1 = c:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     th1:SetPoint("TOPLEFT", 15, y); th1:SetText("--- Health Thresholds ---"); y = y - 35
 
@@ -302,7 +319,7 @@ function UI:LoadLayout(c)
     local function updateBarUnitsVisibility()
         if not c.bUnits then return end
         local show = (ns.DB.frame.bars.horizontalFill ~= false)
-        c.bUnits:SetShown(show)
+        if show then c.bUnits:Show() else c.bUnits:Hide() end
     end
 
     c.bHorizontal = mkCheck(c, "Horizontal Fill (Bars)", "Fill each group left-to-right before moving down.",
@@ -351,18 +368,30 @@ end
 
 function UI:UpdateLayoutVisibility(c)
     local isGrid = ns.DB.frame.layoutStyle == "grid"
-    c.splitCheck:SetShown(not isGrid)
-    c.barHeader:SetShown(not isGrid)
-    c.bScale:SetShown(not isGrid); c.bWidth:SetShown(not isGrid); c.bHeight:SetShown(not isGrid)
-    c.bSpacing:SetShown(not isGrid); c.bCols:SetShown(not isGrid); c.bGroupSp:SetShown(not isGrid)
-    if c.bHorizontal then c.bHorizontal:SetShown(not isGrid) end
-    if c.bUnits then
-        local showUnits = (not isGrid) and (ns.DB.frame.bars.horizontalFill ~= false)
-        c.bUnits:SetShown(showUnits)
+    local bar = not isGrid
+    if bar then c.splitCheck:Show() else c.splitCheck:Hide() end
+    if bar then c.barHeader:Show() else c.barHeader:Hide() end
+    if bar then c.bScale:Show() else c.bScale:Hide() end
+    if bar then c.bWidth:Show() else c.bWidth:Hide() end
+    if bar then c.bHeight:Show() else c.bHeight:Hide() end
+    if bar then c.bSpacing:Show() else c.bSpacing:Hide() end
+    if bar then c.bCols:Show() else c.bCols:Hide() end
+    if bar then c.bGroupSp:Show() else c.bGroupSp:Hide() end
+    if c.bHorizontal then
+        if bar then c.bHorizontal:Show() else c.bHorizontal:Hide() end
     end
-    c.gridHeader:SetShown(isGrid)
-    c.gScale:SetShown(isGrid); c.gSize:SetShown(isGrid); c.gCols:SetShown(isGrid); c.gSpacing:SetShown(isGrid)
-    if c.gHorizontal then c.gHorizontal:SetShown(isGrid) end
+    if c.bUnits then
+        local showUnits = bar and (ns.DB.frame.bars.horizontalFill ~= false)
+        if showUnits then c.bUnits:Show() else c.bUnits:Hide() end
+    end
+    if isGrid then c.gridHeader:Show() else c.gridHeader:Hide() end
+    if isGrid then c.gScale:Show() else c.gScale:Hide() end
+    if isGrid then c.gSize:Show() else c.gSize:Hide() end
+    if isGrid then c.gCols:Show() else c.gCols:Hide() end
+    if isGrid then c.gSpacing:Show() else c.gSpacing:Hide() end
+    if c.gHorizontal then
+        if isGrid then c.gHorizontal:Show() else c.gHorizontal:Hide() end
+    end
 end
 
 function UI:LoadStyle(c)
@@ -993,6 +1022,9 @@ function UI:RefreshProfiles(c)
                 OnAccept = function()
                     PB_HF_DB.profiles[ns.Profiles:GetProfileName()] = ns.Profiles:DeepCopy(PB_HF_DB.profiles[name])
                     ns.Profiles:SetProfile(ns.Profiles:GetProfileName())
+                    for tName, data in pairs(tabContent) do
+                        if data.child.loaded and tName ~= "Profiles" then data.child.loaded = false end
+                    end
                 end,
                 timeout = 0, whileDead = true, hideOnEscape = true,
             }

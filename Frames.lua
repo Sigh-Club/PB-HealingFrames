@@ -5,6 +5,7 @@ ns.Frames = Frames
 Frames.container = nil
 Frames.anchors = {}
 Frames.buttons = {}
+Frames.tankPetButtons = {}
 Frames.unitButtons = {}
 Frames.guidButtons = {}
 Frames.MAX = 40
@@ -45,13 +46,17 @@ local function unpackColor(t, default)
     return unpack(default or {1,1,1})
 end
 
+local _defCrit = {0.95, 0.15, 0.15}
+local _defInj = {0.95, 0.82, 0.20}
+local _defHlt = {0.15, 0.78, 0.22}
+
 local function healthColor(pct)
     local f = ns.DB.frame
     local crit = f.criticalThreshold or 35
     local inj = f.injuredThreshold or 70
-    if pct <= crit then return unpackColor(f.criticalColor, {0.95, 0.15, 0.15})
-    elseif pct <= inj then return unpackColor(f.injuredColor, {0.95, 0.82, 0.20})
-    else return unpackColor(f.healthyColor, {0.15, 0.78, 0.22}) end
+    if pct <= crit then return unpackColor(f.criticalColor, _defCrit)
+    elseif pct <= inj then return unpackColor(f.injuredColor, _defInj)
+    else return unpackColor(f.healthyColor, _defHlt) end
 end
 
 local function getDispelColor(dtype)
@@ -350,7 +355,6 @@ local function CreateButton(i)
     local b = CreateFrame("Button", "PB_HF_UnitButton"..i, Frames.container, "SecureUnitButtonTemplate,SecureHandlerEnterLeaveTemplate")
     b:RegisterForClicks("AnyUp")
     b:SetAttribute("type2", "target")
-    b:SetAttribute("*type1", "target")
     b.index = i
 
     -- Enable Mouse Wheel Support via SecureHandler (Clique style)
@@ -379,7 +383,6 @@ local function CreateButton(i)
 
     -- 1a. Border for Bars mode
     local border = b:CreateTexture(nil, "BORDER")
-    border:SetAllPoints()
     border:SetTexture(0, 0, 0, 1)
     border:SetPoint("TOPLEFT", -1, 1)
     border:SetPoint("BOTTOMRIGHT", 1, -1)
@@ -393,26 +396,31 @@ local function CreateButton(i)
     shine:SetBlendMode("ADD")
     b.shine = shine
 
-    -- 2. Bar Container
-    local barContainer = CreateFrame("Frame", nil, b)
-    barContainer:SetAllPoints()
-    barContainer:SetFrameLevel(b:GetFrameLevel() + 1)
-    barContainer:EnableMouse(false)
-    b.barContainer = barContainer
-
-    -- 3. Health & Prediction
-    local incHeal = CreateFrame("StatusBar", nil, barContainer)
-    incHeal:SetPoint("TOPLEFT", 1, -1)
-    incHeal:SetPoint("BOTTOMRIGHT", -1, 1)
-    incHeal:SetStatusBarTexture(STATUS_BAR_TEX)
-    incHeal:SetStatusBarColor(0.2, 1.0, 0.2, 0.4)
-    b.incHeal = incHeal
-
-    local hp = CreateFrame("StatusBar", nil, barContainer)
+    -- 3. Health Bar (bottom layer)
+    local hp = CreateFrame("StatusBar", nil, b)
     hp:SetPoint("TOPLEFT", 1, -1)
     hp:SetPoint("BOTTOMRIGHT", -1, 1)
+    hp:SetFrameLevel(b:GetFrameLevel() + 1)
     hp:SetStatusBarTexture(STATUS_BAR_TEX)
     b.hp = hp
+
+    -- 3a. Others' Heal Prediction (middle layer - blue tint)
+    local incHealOthers = CreateFrame("StatusBar", nil, b)
+    incHealOthers:SetPoint("TOPLEFT", 1, -1)
+    incHealOthers:SetPoint("BOTTOMRIGHT", -1, 1)
+    incHealOthers:SetFrameLevel(b:GetFrameLevel() + 2)
+    incHealOthers:SetStatusBarTexture(STATUS_BAR_TEX)
+    incHealOthers:SetStatusBarColor(0.0, 0.5, 1.0, 0.35)
+    b.incHealOthers = incHealOthers
+
+    -- 3b. My Heal Prediction (top layer - bright green)
+    local incHealMine = CreateFrame("StatusBar", nil, b)
+    incHealMine:SetPoint("TOPLEFT", 1, -1)
+    incHealMine:SetPoint("BOTTOMRIGHT", -1, 1)
+    incHealMine:SetFrameLevel(b:GetFrameLevel() + 3)
+    incHealMine:SetStatusBarTexture(STATUS_BAR_TEX)
+    incHealMine:SetStatusBarColor(0.2, 1.0, 0.2, 0.45)
+    b.incHealMine = incHealMine
 
     -- 4. Status Overlay (The Tint Fix) - Must cover the WHOLE bar
     local overlayLayer = CreateFrame("Frame", nil, b)
@@ -531,7 +539,6 @@ local function CreateButton(i)
     name:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
     name:SetShadowOffset(1, -1)
     name:SetTextColor(1, 1, 1)
-    name:SetWordWrap(false)
     name:SetNonSpaceWrap(false)
     b.nameText = name
 
@@ -685,8 +692,13 @@ function Frames:EnsureAnchors(activeGroups)
     else
         -- Combined mode: Only show master anchor visuals if UNLOCKED
         local isUnlocked = not ns.DB.locked
-        self.container.bg:SetShown(isUnlocked)
-        self.container.label:SetShown(isUnlocked)
+        if isUnlocked then
+            self.container.bg:Show()
+            self.container.label:Show()
+        else
+            self.container.bg:Hide()
+            self.container.label:Hide()
+        end
         
         for i = 1, 8 do
             if self.anchors[i] then self.anchors[i]:Hide() end
@@ -706,7 +718,6 @@ function Frames:ApplyLayout()
     
     -- We'll call EnsureAnchors from ApplyRoster now to know active groups
     if not self.container then self.container = self:CreateAnchor(nil, self:GetActiveAnchorKey()) end
-    self:RefreshContainerPosition()
     
     local scale = cfg.scale or 1
     self.container:SetScale(scale)
@@ -719,7 +730,8 @@ function Frames:ApplyLayout()
         self.buttons[i] = b
         
         b.hp:SetStatusBarTexture(tex)
-        b.incHeal:SetStatusBarTexture(tex)
+        b.incHealMine:SetStatusBarTexture(tex)
+        b.incHealOthers:SetStatusBarTexture(tex)
         
         if isGrid then
             b:SetSize(cfg.size or 40, cfg.size or 40)
@@ -805,6 +817,148 @@ function Frames:OnFakeUpdate(elapsed)
     end
 end
 
+local function CreateTankPetButton(i)
+    local b = CreateFrame("Button", "PB_HF_TankPetButton"..i, Frames.container, "SecureUnitButtonTemplate,SecureHandlerEnterLeaveTemplate")
+    b:RegisterForClicks("AnyUp")
+    b:SetAttribute("type2", "target")
+    b.index = i
+    b.isPet = true
+
+    b:SetAttribute("_onenter", [=[
+        self:ClearBindings()
+        self:SetBindingClick(0, "MOUSEWHEELUP", self:GetName(), "Button6")
+        self:SetBindingClick(0, "MOUSEWHEELDOWN", self:GetName(), "Button7")
+    ]=])
+    b:SetAttribute("_onleave", [=[
+        self:ClearBindings()
+    ]=])
+
+    local bg = b:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints()
+    bg:SetTexture(SOLID_TEX)
+    bg:SetVertexColor(0, 0, 0, 0.95)
+    b.bg = bg
+
+    local border = b:CreateTexture(nil, "BORDER")
+    border:SetTexture(0, 0, 0, 1)
+    border:SetPoint("TOPLEFT", -1, 1)
+    border:SetPoint("BOTTOMRIGHT", 1, -1)
+    b.border = border
+
+    local hp = CreateFrame("StatusBar", nil, b)
+    hp:SetPoint("TOPLEFT", 1, -1)
+    hp:SetPoint("BOTTOMRIGHT", -1, 1)
+    hp:SetFrameLevel(b:GetFrameLevel() + 1)
+    hp:SetStatusBarTexture(STATUS_BAR_TEX)
+    b.hp = hp
+
+    local incHealOthers = CreateFrame("StatusBar", nil, b)
+    incHealOthers:SetPoint("TOPLEFT", 1, -1)
+    incHealOthers:SetPoint("BOTTOMRIGHT", -1, 1)
+    incHealOthers:SetFrameLevel(b:GetFrameLevel() + 2)
+    incHealOthers:SetStatusBarTexture(STATUS_BAR_TEX)
+    incHealOthers:SetStatusBarColor(0.0, 0.5, 1.0, 0.35)
+    b.incHealOthers = incHealOthers
+
+    local incHealMine = CreateFrame("StatusBar", nil, b)
+    incHealMine:SetPoint("TOPLEFT", 1, -1)
+    incHealMine:SetPoint("BOTTOMRIGHT", -1, 1)
+    incHealMine:SetFrameLevel(b:GetFrameLevel() + 3)
+    incHealMine:SetStatusBarTexture(STATUS_BAR_TEX)
+    incHealMine:SetStatusBarColor(0.2, 1.0, 0.2, 0.45)
+    b.incHealMine = incHealMine
+
+    local overlayLayer = CreateFrame("Frame", nil, b)
+    overlayLayer:SetPoint("TOPLEFT", 1, -1)
+    overlayLayer:SetPoint("BOTTOMRIGHT", -1, 1)
+    overlayLayer:SetFrameLevel(b:GetFrameLevel() + 5)
+    overlayLayer:EnableMouse(false)
+    b.overlayLayer = overlayLayer
+
+    local overlay = overlayLayer:CreateTexture(nil, "OVERLAY")
+    overlay:SetAllPoints()
+    overlay:SetTexture(SOLID_TEX)
+    overlay:SetBlendMode("BLEND")
+    overlay:Hide()
+    b.statusOverlay = overlay
+
+    local glow = CreateFrame("Frame", nil, b)
+    glow:SetPoint("TOPLEFT", -1, 1)
+    glow:SetPoint("BOTTOMRIGHT", 1, -1)
+    glow:SetFrameLevel(b:GetFrameLevel() + 8)
+    glow:EnableMouse(false)
+    local gTop = glow:CreateTexture(nil, "OVERLAY")
+    gTop:SetPoint("TOPLEFT"); gTop:SetPoint("TOPRIGHT"); gTop:SetHeight(1)
+    local gBottom = glow:CreateTexture(nil, "OVERLAY")
+    gBottom:SetPoint("BOTTOMLEFT"); gBottom:SetPoint("BOTTOMRIGHT"); gBottom:SetHeight(1)
+    local gLeft = glow:CreateTexture(nil, "OVERLAY")
+    gLeft:SetPoint("TOPLEFT"); gLeft:SetPoint("BOTTOMLEFT"); gLeft:SetWidth(1)
+    local gRight = glow:CreateTexture(nil, "OVERLAY")
+    gRight:SetPoint("TOPRIGHT"); gRight:SetPoint("BOTTOMRIGHT"); gRight:SetWidth(1)
+    glow.SetBorderColor = function(self, r, g, bl, a)
+        gTop:SetTexture(r, g, bl, a)
+        gBottom:SetTexture(r, g, bl, a)
+        gLeft:SetTexture(r, g, bl, a)
+        gRight:SetTexture(r, g, bl, a)
+    end
+    glow:Hide()
+    b.glow = glow
+
+    local hover = b:CreateTexture(nil, "HIGHLIGHT")
+    hover:SetAllPoints()
+    hover:SetTexture(1, 1, 1, 0.1)
+    hover:SetBlendMode("ADD")
+    b.hover = hover
+
+    local name = b:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    name:SetPoint("LEFT", 4, 0)
+    name:SetPoint("RIGHT", -4, 0)
+    name:SetFont("Fonts\\FRIZQT__.TTF", 8, "OUTLINE")
+    name:SetShadowOffset(1, -1)
+    name:SetTextColor(0.6, 0.8, 1.0)
+    name:SetNonSpaceWrap(false)
+    b.nameText = name
+
+    local petIcon = b:CreateTexture(nil, "OVERLAY")
+    petIcon:SetSize(10, 10)
+    petIcon:SetPoint("LEFT", 2, 0)
+    petIcon:SetTexture("Interface\\Icons\\Ability_Hunter_PetReview")
+    petIcon:SetAlpha(0.6)
+    b.petIcon = petIcon
+
+    return b
+end
+
+local function updateTankPetButton(b)
+    if not b then return end
+    if not b.unit or not UnitExists(b.unit) then
+        if not InCombatLockdown() then b:Hide() end
+        return
+    end
+    local unit = b.unit
+    local maxhp = UnitHealthMax(unit)
+    maxhp = (maxhp > 0) and maxhp or 1
+    local hpVal = UnitHealth(unit)
+    local pct = math.floor((hpVal / maxhp) * 100)
+    local r, g, bl = healthColor(pct)
+
+    b.hp:SetMinMaxValues(0, maxhp)
+    b.hp:SetValue(hpVal)
+    b.hp:SetStatusBarColor(r, g, bl, 0.9)
+    b.incHealMine:SetMinMaxValues(0, maxhp)
+    b.incHealOthers:SetMinMaxValues(0, maxhp)
+
+    local tex = ns.DB.frame.barTexture or STATUS_BAR_TEX
+    b.hp:SetStatusBarTexture(tex)
+    b.incHealMine:SetStatusBarTexture(tex)
+    b.incHealOthers:SetStatusBarTexture(tex)
+
+    b.nameText:SetText(UnitName(unit) or "Pet")
+    if not InCombatLockdown() then b:Show() end
+
+    if ns.HealComm then ns.HealComm:UpdateUnit(b) end
+end
+
 function Frames:ApplyRoster()
     local entries = ns.Roster.entries or {}
     local dbf = ns.DB.frame
@@ -887,7 +1041,6 @@ function Frames:ApplyRoster()
                 end
             end
             
-            -- Track bounds for master container (non-split mode)
             if not dbf.splitGroups then
                 local bw, bh = b:GetWidth(), b:GetHeight()
                 if not found then
@@ -910,13 +1063,51 @@ function Frames:ApplyRoster()
     end
 
     if found and not dbf.splitGroups then
-        -- Resize container to fit all buttons + padding
         self.container:SetSize(maxX - minX + 16, math.abs(maxY - minY) + 16)
     elseif not dbf.splitGroups then
         self.container:SetSize(200, 100)
     end
+
+    local showTankPets = ns.DB.frame.showTankPetsInline
+    local tankPetIdx = 0
+    local tankPetMap = ns.Roster.tankPetMap or {}
+
+    if showTankPets then
+        for i = 1, self.MAX do
+            local b = self.buttons[i]
+            if b and b.unit and tankPetMap[b.unit] then
+                local petUnit = tankPetMap[b.unit]
+                if UnitExists(petUnit) and UnitPlayerControlled(petUnit) then
+                    tankPetIdx = tankPetIdx + 1
+                    local pb = self.tankPetButtons[tankPetIdx] or CreateTankPetButton(tankPetIdx)
+                    self.tankPetButtons[tankPetIdx] = pb
+
+                    if not InCombatLockdown() then
+                        ns:SafeSetAttribute(pb, "unit", petUnit)
+                        pb.unit = petUnit
+                    else
+                        self.queue[pb] = petUnit
+                    end
+
+                    local mainHeight = b:GetHeight()
+                    local petHeight = math.max(math.floor(mainHeight * 0.6), 12)
+                    pb:SetSize(b:GetWidth(), petHeight)
+                    pb:ClearAllPoints()
+                    pb:SetPoint("TOPLEFT", b, "BOTTOMLEFT", 0, -1)
+                    updateTankPetButton(pb)
+                end
+            end
+        end
+    end
+
+    for i = tankPetIdx + 1, #self.tankPetButtons do
+        self.tankPetButtons[i]:Hide()
+    end
+
+    if not showTankPets then
+        for _, pb in ipairs(self.tankPetButtons) do pb:Hide() end
+    end
     
-    -- Now ensure anchors are shown correctly based on active groups
     self:EnsureAnchors(activeGroups)
 end
 
@@ -944,7 +1135,10 @@ local function ShortenName(name)
 end
 
 function Frames:UpdateButton(b)
-    if not ns.DB.enabled then b:Hide(); return end
+    if not ns.DB.enabled then
+        if not InCombatLockdown() then b:Hide() end
+        return
+    end
     local unit = b.unit
     local fake = b.fakeData
     local dbf = ns.DB.frame
@@ -972,8 +1166,11 @@ function Frames:UpdateButton(b)
         b.nameText:SetTextColor(cc.r, cc.g, cc.b)
         
         if UnitInRaid(unit) then
-            local _, raidRole = GetRaidRosterInfo(string.match(unit, "%d+") or 0)
-            if raidRole == "MAINTANK" then role = "TANK" end
+            local raidIdx = string.match(unit, "%d+")
+            if raidIdx then
+                local _, _, _, _, _, _, _, _, _, raidRole = GetRaidRosterInfo(tonumber(raidIdx))
+                if raidRole == "MAINTANK" then role = "TANK" end
+            end
         end
 
         threat = UnitThreatSituation(unit) or 0
@@ -987,8 +1184,8 @@ function Frames:UpdateButton(b)
     b.nameText:SetText(ShortenName(name))
 
     b.hp:SetMinMaxValues(0, maxhp)
-    b.hp:SetValue(hp)
-    b.incHeal:SetMinMaxValues(0, maxhp)
+    b.incHealMine:SetMinMaxValues(0, maxhp)
+    b.incHealOthers:SetMinMaxValues(0, maxhp)
     
     local r, g, bl = healthColor(pct)
     if dbf.useClassColors and not fake and unit then
@@ -1002,16 +1199,21 @@ function Frames:UpdateButton(b)
 
     local tex = dbf.barTexture or STATUS_BAR_TEX
     b.hp:SetStatusBarTexture(tex)
-    b.incHeal:SetStatusBarTexture(tex)
+    b.incHealMine:SetStatusBarTexture(tex)
+    b.incHealOthers:SetStatusBarTexture(tex)
 
     if dbf.invertedColors then
         b.bg:SetVertexColor(r, g, bl, 0.9)
         b.hp:SetStatusBarColor(0, 0, 0, 0.8)
         b.hp:SetValue(maxhp - hp)
+        b.incHealMine:SetStatusBarColor(0.2, 1.0, 0.2, 0.35)
+        b.incHealOthers:SetStatusBarColor(0.0, 0.5, 1.0, 0.25)
     else
         b.bg:SetVertexColor(0, 0, 0, 0.95)
         b.hp:SetStatusBarColor(r, g, bl, 0.9)
         b.hp:SetValue(hp)
+        b.incHealMine:SetStatusBarColor(0.2, 1.0, 0.2, 0.45)
+        b.incHealOthers:SetStatusBarColor(0.0, 0.5, 1.0, 0.35)
     end
 
     -- Role Icon
@@ -1135,7 +1337,6 @@ function Frames:UpdateButton(b)
     self:UpdateRange(b)
     if ns.Auras then ns.Auras:UpdateButtonAuras(b) end
     if ns.HealComm then ns.HealComm:UpdateUnit(b) end
-    if ns.ClickCast then ns.ClickCast:ApplyBindings(b) end
 end
 
 function Frames:GetButtonForUnit(unit)
@@ -1207,6 +1408,9 @@ function Frames:OnEvent(event, unit)
             self._layoutPending = nil
             self:ApplyLayout()
         end
+        for _, pb in ipairs(self.tankPetButtons) do
+            if pb.unit then updateTankPetButton(pb) end
+        end
     elseif event == "PLAYER_TARGET_CHANGED" or event == "PLAYER_FOCUS_CHANGED" then
         for _, b in ipairs(self.buttons) do 
             if b:IsShown() and b.unit then self:UpdateButton(b) end 
@@ -1217,5 +1421,8 @@ function Frames:OnEvent(event, unit)
         end
     elseif unit then
         for _, b in ipairs(self.buttons) do if b.unit == unit then self:UpdateButton(b) end end
+        for _, pb in ipairs(self.tankPetButtons) do
+            if pb.unit == unit then updateTankPetButton(pb) end
+        end
     end
 end

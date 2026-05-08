@@ -9,6 +9,7 @@ local centerIds = {}
 local auraCache = {}
 local collectActiveAuras
 local samplingEnabled = false
+local HOT_ORDER_BARS = {"topleft", "bottomleft", "topright", "bottomright"}
 local fallbackTrackedAuras = {
     topleft = {
         774, 26982, 139, 61295, 61299, 53601, 33763,
@@ -225,13 +226,9 @@ collectActiveAuras = function(unit)
     -- Populate hotList from buckets (strict 4-HoT limit, active only)
     for prio = 1, 4 do
         local bucket = hotBuckets[prio]
-        if bucket then
-            for _, entry in ipairs(bucket) do
-                table.insert(active.hotList, entry)
-                if #active.hotList >= 4 then break end
-            end
+        if bucket and #bucket > 0 then
+            active.hotList[prio] = bucket[1]
         end
-        if #active.hotList >= 4 then break end
     end
 
     if UnitIsUnit(unit, "player") and ns.Roster and ns.Roster.fakeIcons then
@@ -461,9 +458,10 @@ function Auras:UpdateButtonAuras(btn, cached)
                 end
                 if ind.timerText then
                     ind:SetScript("OnUpdate", function(selfIndicator, _)
-                        if not ns.DB.frame.showAuraTimers then
+                        if not (ns.DB and ns.DB.frame and ns.DB.frame.showAuraTimers) then
                             selfIndicator.timerText:SetText("")
                             selfIndicator.timerText:Hide()
+                            selfIndicator:SetScript("OnUpdate", nil)
                             return
                         end
                         local remain = data.expires - GetTime()
@@ -514,12 +512,16 @@ function Auras:UpdateButtonAuras(btn, cached)
     local centerData = active and active.center
     if not centerData and btn.curableDebuff then
         local d = btn.curableDebuff
-        centerData = { icon = d.texture, count = d.count or 0, duration = d.duration or 0, expires = d.expires or 0 }
+        centerData = { icon = d.texture, count = d.count or 0, duration = d.duration or 0, expires = d.expires or 0, isMine = false }
     end
     applyIndicator(btn.auraIndicators and btn.auraIndicators.center, centerData)
 end
 
 function Auras:OnEvent(event, unit)
+    if event == "PARTY_MEMBERS_CHANGED" or event == "RAID_ROSTER_UPDATE" then
+        wipe(auraCache)
+        return
+    end
     if event == "UNIT_AURA" then
         if samplingEnabled and unit then
             recordSamples(unit)
